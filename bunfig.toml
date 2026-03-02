@@ -1,0 +1,6 @@
+[test]
+timeout = 30000
+coverage = false
+
+[install]
+frozenLockfile = false

@@ -1,0 +1,29 @@
+{
+  "name": "Standard User Story",
+  "description": "Default template for generating user stories with acceptance criteria",
+  "requiredHeadings": [
+    "Description",
+    "Acceptance Criteria",
+    "Technical Notes",
+    "Out of Scope"
+  ],
+  "defaultSections": [
+    {
+      "heading": "Description",
+      "placeholder": "As a [user type], I want to [action] so that [benefit]."
+    },
+    {
+      "heading": "Acceptance Criteria",
+      "placeholder": "- Given [context], when [action], then [outcome].\n- Given [context], when [action], then [outcome]."
+    },
+    {
+      "heading": "Technical Notes",
+      "placeholder": "Implementation details, constraints, and technical considerations."
+    },
+    {
+      "heading": "Out of Scope",
+      "placeholder": "What is explicitly NOT included in this story."
+    }
+  ],
+  "customFieldMappings": {}
+}

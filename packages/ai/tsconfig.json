@@ -1,0 +1,11 @@
+{
+  "extends": "@gamole/config/tsconfig-node",
+  "compilerOptions": {
+    "strict": true,
+    "types": ["bun-types"],
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

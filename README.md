@@ -1,0 +1,222 @@
+# 🧀 Gamole
+
+AI-powered ticket refinement engine. Takes rough feature requests, runs them through multiple AI agents for review, and outputs structured Linear issues ready for sprint planning.
+
+## What it does
+
+1. **You describe a feature** in plain text
+2. **5 AI agents** (Draft, QA, Dev, PO, Supervisor) iteratively refine it
+3. **You review and edit** the refined document (human-in-the-loop)
+4. **Structured output**: epics and stories with acceptance criteria, technical notes, and team assignments
+5. **Push to Linear**: each epic routed to the right team, cross-team projects created automatically
+6. **Chat with Linear**: ask questions about your workspace in natural language
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────────────────────────────────────┐
+│  Next.js UI  │────▶│  FastAPI Backend                              │
+│  (port 3000) │     │                                              │
+└─────────────┘     │  ┌──────────┐  ┌────────────┐  ┌──────────┐ │
+                    │  │ LangGraph │  │ LangChain  │  │ pgvector │ │
+                    │  │ Workflow  │  │ + LiteLLM  │  │ RAG      │ │
+                    │  └──────────┘  └────────────┘  └──────────┘ │
+                    │                                              │
+                    │  ┌──────────┐  ┌────────────┐  ┌──────────┐ │
+                    │  │ Linear   │  │ GitHub     │  │ Feedback │ │
+                    │  │ GraphQL  │  │ Codebase   │  │ Tracking │ │
+                    │  └──────────┘  └────────────┘  └──────────┘ │
+                    └──────────────────────────────────────────────┘
+```
+
+### Workflow (LangGraph)
+
+```
+Input -> Retrieve Context -> Draft -> [QA, Dev, PO] parallel -> Merge -> Supervisor
+                              ▲                                            │
+                              └────── loop if quality < threshold ─────────┘
+                                                                           │
+                                                              ▼ (approved)
+                                                        USER_EDITING (pause)
+                                                              │
+                                                        Finalize -> Structure -> Push to Linear
+```
+
+- Max 5 iteration rounds
+- QA, Dev, and PO agents run in parallel (fan-out/fan-in)
+- Supervisor decides: loop for another round or approve
+- Human-in-the-loop: edit the refined document before structuring
+- Structurer assigns each epic to the right Linear team based on descriptions
+
+### RAG Context
+
+Agents receive context from two sources:
+
+- **Linear issues**: similar existing tickets via pgvector cosine similarity
+- **Codebase chunks**: relevant code from indexed repositories
+
+This grounds the output in your actual codebase and existing ticket patterns.
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | Next.js 15, React, Tailwind, ky |
+| Backend | FastAPI, uvicorn, SSE streaming |
+| AI | LangChain, LangGraph, Gemini (via langchain-google-genai) |
+| Database | PostgreSQL 16, SQLAlchemy 2.0 async, pgvector, Alembic |
+| Integrations | Linear GraphQL API, GitHub API |
+| Testing | pytest, ruff |
+| Package manager | uv |
+
+## Setup
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 18+ and pnpm
+- Docker (for PostgreSQL + pgvector)
+- Gemini API key
+- Linear API token (optional, for push/chat features)
+- GitHub token (optional, for private repo indexing)
+
+### Environment
+
+```bash
+cp .env.example .env
+```
+
+```env
+# Required
+GOOGLE_GENERATIVE_AI_API_KEY=AIza...
+GEMINI_API_KEY=AIza...
+DATABASE_URL=postgresql+asyncpg://postgres:gamole_dev@localhost:5432/gamole
+SESSION_SECRET=your-secret-minimum-32-characters-long
+
+# Optional
+LINEAR_API_TOKEN=lin_api_...
+GITHUB_TOKEN=ghp_...
+CORS_ORIGINS=http://localhost:3000
+```
+
+### Database
+
+```bash
+docker compose up -d postgres
+```
+
+Ports bind to `127.0.0.1` only (not exposed to internet).
+
+### Backend
+
+```bash
+uv sync
+cd apps/api
+PYTHONPATH=.:../../ uv run uvicorn app.main:app --port 3001
+```
+
+### Frontend
+
+```bash
+pnpm install
+cd apps/web
+NEXT_PUBLIC_API_URL=http://localhost:3001 pnpm dev
+```
+
+### Tests
+
+```bash
+uv run pytest apps/api/tests/ -v       # unit tests (no DB needed)
+uv run ruff check packages/ apps/api/   # linting
+```
+
+DB-dependent tests skip automatically when PostgreSQL isn't running.
+
+## API Endpoints
+
+### Generation (ticket refinement)
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/generation` | Start a new generation workflow |
+| GET | `/api/generation` | List all generations |
+| GET | `/api/generation/{id}` | Get generation status and output |
+| GET | `/api/generation/{id}/output` | Get structured epics/stories |
+| GET | `/api/generation/{id}/stream` | SSE stream for real-time progress |
+| PUT | `/api/generation/{id}/document` | Edit refined document (human-in-the-loop) |
+| POST | `/api/generation/{id}/finalize` | Trigger structuring after editing |
+
+### Linear
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/linear/validate` | Pre-push validation (count issues) |
+| POST | `/api/linear/push` | Push structured output to Linear |
+| POST | `/api/linear/push-generation` | Push a generation directly |
+| POST | `/api/chat/linear` | Chat with Linear in natural language |
+| POST | `/api/chat/search` | Semantic search over cached issues |
+
+### Configuration
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/repositories` | Manage codebase repositories |
+| GET | `/api/repositories/github/available` | Browse GitHub repos for selection |
+| POST | `/api/repositories/{id}/index` | Trigger codebase indexing |
+| GET/POST | `/api/teams` | Manage Linear teams with descriptions |
+| POST | `/api/teams/sync` | Import teams from Linear API |
+| POST | `/api/sync/linear` | Sync Linear issues to pgvector cache |
+
+### Other
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/context` | Query RAG context directly |
+| POST | `/api/feedback/{id}` | Submit post-push feedback |
+| GET | `/api/feedback/stats` | Feedback statistics |
+
+## Key Features
+
+### Per-epic team routing
+
+Each epic is assigned to the most appropriate Linear team by the AI, based on team descriptions you provide. A feature spanning payments and origination will split into epics for each team, linked under a shared Linear project.
+
+### Cost tracking
+
+Every generation tracks token usage per agent with estimated costs (Gemini Flash pricing). Stored as JSONB on the workflow record and returned in API responses.
+
+### Human-in-the-loop
+
+After AI approval, the workflow pauses in `USER_EDITING` state. Edit the document, then finalize to trigger structuring. The SSE stream emits `user_edit_required` so the frontend knows to show an editor.
+
+### Chat with Linear
+
+Ask questions like "How many tickets did Nelly create last 3 weeks?" or "What's blocked in origination?" The LLM converts to GraphQL, executes against Linear's API, self-corrects on errors, and returns a natural language answer with sources.
+
+### Feedback loop
+
+Track which stories get edited after Linear push. Submit feedback via the API. Statistics endpoint shows what changes most, informing future prompt improvements.
+
+## Project Structure
+
+```
+apps/
+  api/                 # FastAPI backend
+    app/
+      routes/          # API endpoints
+      orchestrator/    # LangGraph workflow
+      auth/            # JWT auth
+      config.py        # pydantic-settings
+  web/                 # Next.js frontend
+
+packages/
+  gamole_ai/          # LangChain agents, embeddings, retrieval, codebase indexer
+  gamole_db/          # SQLAlchemy models, session management
+  gamole_linear/      # Linear GraphQL client, batch push, sync
+  gamole_types/       # Pydantic schemas (shared types)
+```
+
+## License
+
+Private.

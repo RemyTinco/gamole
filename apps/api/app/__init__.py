@@ -1,0 +1,1 @@
+"""Gamole API - FastAPI application."""
