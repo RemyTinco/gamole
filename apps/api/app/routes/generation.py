@@ -575,7 +575,7 @@ async def submit_discovery_answers(generation_id: str, body: DiscoveryAnswersInp
         wf = await session.get(Workflow, uuid.UUID(generation_id))
         if wf:
             wf.document = enriched_document
-            wf.status = "RUNNING"
+            wf.status = "CONTEXT_RETRIEVED"
             existing_state = wf.state_json or {}
             existing_state.setdefault("discovery", {})
             existing_state["discovery"]["answers"] = [a.model_dump() for a in discovery_answers]
