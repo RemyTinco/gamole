@@ -2,7 +2,7 @@
 
 import { useState, useEffect, use } from "react"
 import useSWR from "swr"
-import { getGeneration, updateDocument, finalizeGeneration } from "@/lib/api-client"
+import { getGeneration, updateDocument, finalizeGeneration, submitDiscoveryAnswers } from "@/lib/api-client"
 import { useGenerationStream } from "@/hooks/use-generation-stream"
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -14,16 +14,17 @@ import { Check, Circle, Loader2, Send, Save, ChevronDown, ChevronRight, AlertCir
 import { toast } from "sonner"
 import type { Generation, GeneratedEpic } from "@/lib/types"
 
-const PIPELINE_STEPS = ["Retrieve Context", "Draft", "QA/Dev/PO", "Supervisor", "Structure"]
+const PIPELINE_STEPS = ["Retrieve Context", "Discovery", "Draft", "QA/Dev/PO", "Supervisor", "Structure"]
 
 function stepIndex(node: string | null): number {
   if (!node) return -1
   const lower = node.toLowerCase()
   if (lower.includes("retriev") || lower.includes("context")) return 0
-  if (lower.includes("draft")) return 1
-  if (lower.includes("qa") || lower.includes("dev") || lower.includes("po") || lower.includes("review")) return 2
-  if (lower.includes("supervis")) return 3
-  if (lower.includes("struct")) return 4
+  if (lower.includes("discover") || lower.includes("awaiting")) return 1
+  if (lower.includes("draft")) return 2
+  if (lower.includes("qa") || lower.includes("dev") || lower.includes("po") || lower.includes("review")) return 3
+  if (lower.includes("supervis")) return 4
+  if (lower.includes("struct")) return 5
   return -1
 }
 
@@ -40,12 +41,14 @@ export default function GenerationDetailPage({
   const [finalizing, setFinalizing] = useState(false)
   const [costOpen, setCostOpen] = useState(false)
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set())
+  const [discoveryAnswers, setDiscoveryAnswers] = useState<Record<string, string>>({})
+  const [submittingDiscovery, setSubmittingDiscovery] = useState(false)
 
   const status = stream.status !== "connecting" ? stream.status : gen?.status || "Loading"
   const canEditDocument = status === "USER_EDITING" || status === "READY_TO_PUSH"
   const isComplete = ["COMPLETED", "READY_TO_PUSH", "PUSHED_TO_LINEAR", "STRUCTURED"].includes(status) || stream.isComplete
   const isError = status === "ERROR"
-  const currentStepIdx = stepIndex(stream.currentNode)
+  const currentStepIdx = status === "AWAITING_DISCOVERY" ? 1 : stepIndex(stream.currentNode)
 
   useEffect(() => {
     if (canEditDocument && gen?.document) {
@@ -74,6 +77,23 @@ export default function GenerationDetailPage({
       mutate()
     } catch { toast.error("Failed to finalize") }
     setFinalizing(false)
+  }
+
+  const handleDiscoverySubmit = async () => {
+    if (!gen?.discoveryQuestions) return
+    setSubmittingDiscovery(true)
+    try {
+      const answers = gen.discoveryQuestions.map(q => ({
+        question_id: q.id,
+        answer: discoveryAnswers[q.id] || "",
+      }))
+      await submitDiscoveryAnswers(id, answers)
+      toast.success("Answers submitted! Generating your tickets...")
+      mutate()
+    } catch {
+      toast.error("Failed to submit answers")
+    }
+    setSubmittingDiscovery(false)
   }
 
 
@@ -141,6 +161,50 @@ export default function GenerationDetailPage({
           <AlertTitle>Generation Failed</AlertTitle>
           <AlertDescription>{stream.error || gen.error || "An unknown error occurred"}</AlertDescription>
         </Alert>
+      )}
+
+      {/* Discovery form */}
+      {status === "AWAITING_DISCOVERY" && gen?.discoveryQuestions && gen.discoveryQuestions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Discovery Questions</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Answer these questions to help us generate better tickets for your feature.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {gen.discoveryQuestions.map((q) => (
+              <div key={q.id} className="space-y-1.5">
+                <label htmlFor={`discovery-${q.id}`} className="text-sm font-medium leading-none">
+                  {q.text}
+                </label>
+                <textarea
+                  id={`discovery-${q.id}`}
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                  placeholder={q.placeholder || "Your answer..."}
+                  value={discoveryAnswers[q.id] || ""}
+                  onChange={(e) => setDiscoveryAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+                  disabled={submittingDiscovery}
+                />
+              </div>
+            ))}
+          </CardContent>
+          <CardFooter>
+            <Button
+              onClick={handleDiscoverySubmit}
+              disabled={
+                submittingDiscovery ||
+                !gen.discoveryQuestions.every(q => (discoveryAnswers[q.id] || "").trim())
+              }
+            >
+              {submittingDiscovery ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting...</>
+              ) : (
+                <><Send className="h-4 w-4 mr-2" />Submit Answers</>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
       )}
 
       {/* Document panel for editing */}
