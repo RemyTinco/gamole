@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import type { GenerationEvent } from "@/lib/types"
+import type { GenerationEvent, DiscoveryQuestion } from "@/lib/types"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 
@@ -13,6 +13,7 @@ interface StreamState {
   isComplete: boolean
   events: GenerationEvent[]
   error: string | null
+  discoveryQuestions: DiscoveryQuestion[] | null
 }
 
 export function useGenerationStream(id: string | null) {
@@ -24,6 +25,7 @@ export function useGenerationStream(id: string | null) {
     isComplete: false,
     events: [],
     error: null,
+    discoveryQuestions: null,
   })
   const esRef = useRef<EventSource | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -60,6 +62,10 @@ export function useGenerationStream(id: string | null) {
           if (parsed.type === "error") {
             update.error = (parsed.data.error as string) || "Unknown error"
             update.status = "ERROR"
+          }
+          if (parsed.type === "discovery_questions") {
+            update.discoveryQuestions = parsed.data.questions as DiscoveryQuestion[]
+            update.status = "AWAITING_DISCOVERY"
           }
 
           return { ...prev, ...update }

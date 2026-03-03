@@ -72,6 +72,10 @@ export async function finalizeGeneration(id: string) {
   return api.post(`api/generation/${id}/finalize`).json()
 }
 
+export async function submitDiscoveryAnswers(id: string, answers: Array<{ question_id: string; answer: string }>) {
+  return api.post(`api/generation/${id}/discovery-answers`, { json: { answers } }).json<{ status: string }>()
+}
+
 export function streamGeneration(id: string): EventSource {
   const token = typeof window !== "undefined" ? localStorage.getItem("gamole_token") : null
   const url = `${API_BASE}/api/generation/${id}/stream${token ? `?token=${token}` : ""}`
