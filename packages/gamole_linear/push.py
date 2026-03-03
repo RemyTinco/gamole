@@ -112,9 +112,13 @@ async def push_to_linear(
     # Build pending issues with per-epic team routing
     pending_issues: list[dict] = []
     story_to_epic: list[dict] = []
+    missing_teams: list[str] = []
 
     for epic_idx, epic in enumerate(output.epics):
         team_id = epic_team_ids.get(epic_idx) or config.team_id
+        if not team_id:
+            missing_teams.append(epic.epic_title or f"Epic {epic_idx + 1}")
+            continue
         epic_key = f"epic:{epic_idx}"
         pending_issues.append({
             "key": epic_key,
@@ -132,6 +136,20 @@ async def push_to_linear(
             })
             story_to_epic.append({"epicKey": epic_key, "storyKey": story_key})
 
+    if missing_teams:
+        team_list = ", ".join(missing_teams)
+        errors.append(
+            f"No team ID resolved for: {team_list}. "
+            f"Set a default teamId in push config or sync teams first."
+        )
+
+    if not pending_issues:
+        await client.close()
+        return LinearPushResult(
+            createdIssues=created_issues,
+            createdRelations=created_relations,
+            errors=errors,
+        )
     # Phase 1: Create issues in batches of 20
     batches = _chunk(pending_issues, 20)
     for batch_idx, batch in enumerate(batches):

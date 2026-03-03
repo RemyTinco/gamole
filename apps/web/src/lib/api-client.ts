@@ -88,8 +88,23 @@ export async function pushToLinear(issues: Record<string, unknown>[]) {
   return api.post("api/linear/push", { json: { issues } }).json()
 }
 
-export async function pushGeneration(generationId: string) {
-  return api.post("api/linear/push-generation", { json: { generationId } }).json<{ createdIssues: string[] }>()
+export interface PushConfig {
+  teamId?: string
+  projectId?: string
+  labels?: string[]
+  stateId?: string
+}
+
+export interface PushResult {
+  createdIssues: Array<{ linearId: string; identifier: string; title: string }>
+  createdRelations: Array<{ id: string; type: string }>
+  errors: string[]
+}
+
+export async function pushGeneration(generationId: string, config?: PushConfig) {
+  return api.post("api/linear/push-generation", {
+    json: { generationId, config: config ?? {} },
+  }).json<PushResult>()
 }
 
 // Chat

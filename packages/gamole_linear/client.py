@@ -87,13 +87,17 @@ class LinearClient:
         response.raise_for_status()
         data = response.json()
         if "errors" in data:
-            # Check for rate limiting
             errors = data["errors"]
+            # Check for rate limiting
             if any(e.get("extensions", {}).get("code") == "RATELIMITED" for e in errors):
                 raise httpx.HTTPStatusError(
                     "Rate limited", request=response.request, response=response
                 )
-        return data.get("data", {})
+            # If data is null/missing, raise with the GraphQL error messages
+            if data.get("data") is None:
+                error_msgs = "; ".join(e.get("message", "Unknown error") for e in errors)
+                raise RuntimeError(f"GraphQL errors: {error_msgs}")
+        return data.get("data") or {}
 
     async def get_issues(
         self,

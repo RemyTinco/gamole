@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { getGeneration, updateStructuredOutput, pushGeneration } from '@/lib/api-client'
+import { getGeneration, updateStructuredOutput, pushGeneration, listTeams } from '@/lib/api-client'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
+import { Select } from '@/components/ui/select'
 import {
   Save,
   Send,
@@ -29,7 +30,8 @@ import {
   X,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { GeneratedOutput, GeneratedEpic, GeneratedStory } from '@/lib/types'
+import type { GeneratedOutput, GeneratedEpic, GeneratedStory, Team } from '@/lib/types'
+import type { PushResult } from '@/lib/api-client'
 
 export default function ReviewAndPushPage() {
   const { id } = useParams<{ id: string }>()
@@ -42,9 +44,12 @@ export default function ReviewAndPushPage() {
   const [saving, setSaving] = useState(false)
   const [pushing, setPushing] = useState(false)
   const [pushed, setPushed] = useState(false)
-  const [pushedIssues, setPushedIssues] = useState<string[]>([])
+  const [pushResult, setPushResult] = useState<PushResult | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [lastSaved, setLastSaved] = useState(false)
+
+  const [teams, setTeams] = useState<Team[]>([])
+  const [selectedTeamId, setSelectedTeamId] = useState<string>('')
 
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -55,7 +60,6 @@ export default function ReviewAndPushPage() {
   } | null>(null)
 
   const [pushDialog, setPushDialog] = useState(false)
-
   // Load generation on mount
   useEffect(() => {
     async function load() {
@@ -63,7 +67,6 @@ export default function ReviewAndPushPage() {
         const gen = await getGeneration(id)
         if (gen.structuredOutput) {
           setOutput(gen.structuredOutput)
-          // Expand all epics by default
           setExpandedEpics(new Set(gen.structuredOutput.epics.map((_, i) => i)))
         }
       } catch (err) {
@@ -74,6 +77,23 @@ export default function ReviewAndPushPage() {
     }
     load()
   }, [id])
+
+  // Load teams on mount
+  useEffect(() => {
+    async function loadTeams() {
+      try {
+        const data = await listTeams()
+        setTeams(data.teams)
+        const firstTeam = data.teams[0]
+        if (data.teams.length === 1 && firstTeam) {
+          setSelectedTeamId(firstTeam.id)
+        }
+      } catch {
+        // Teams fetch is best-effort; push will fail later with a clear error
+      }
+    }
+    loadTeams()
+  }, [])
 
   // Warn before leaving with unsaved changes
   useEffect(() => {
@@ -236,13 +256,23 @@ export default function ReviewAndPushPage() {
   }
 
   async function handlePush() {
+    if (!selectedTeamId) {
+      toast.error('Please select a team before pushing')
+      return
+    }
     setPushing(true)
     try {
-      const result = await pushGeneration(id)
-      setPushedIssues(result.createdIssues || [])
+      const result = await pushGeneration(id, { teamId: selectedTeamId })
+      setPushResult(result)
+      if (result.errors.length > 0 && result.createdIssues.length === 0) {
+        toast.error('Push failed — see errors below')
+      } else if (result.errors.length > 0) {
+        toast.warning('Pushed with some errors — see details below')
+      } else {
+        toast.success('Pushed to Linear!')
+      }
       setPushed(true)
       setPushDialog(false)
-      toast.success('Pushed to Linear!')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to push to Linear')
       setPushDialog(false)
@@ -291,22 +321,41 @@ export default function ReviewAndPushPage() {
     )
   }
 
-  if (pushed) {
+  if (pushed && pushResult) {
+    const hasErrors = pushResult.errors.length > 0
+    const hasIssues = pushResult.createdIssues.length > 0
     return (
       <div className="space-y-4 max-w-4xl">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
-            <Check className="h-5 w-5 text-green-700" />
+          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${hasErrors && !hasIssues ? 'bg-red-100' : 'bg-green-100'}`}>
+            {hasErrors && !hasIssues ? (
+              <X className="h-5 w-5 text-red-700" />
+            ) : (
+              <Check className="h-5 w-5 text-green-700" />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-green-700">Pushed to Linear!</h1>
+          <h1 className={`text-2xl font-bold ${hasErrors && !hasIssues ? 'text-red-700' : 'text-green-700'}`}>
+            {hasErrors && !hasIssues ? 'Push Failed' : 'Pushed to Linear!'}
+          </h1>
         </div>
-        <p className="text-muted-foreground">
-          Your requirements have been created in Linear.
-        </p>
-        {pushedIssues.length > 0 && (
+        {hasIssues && (
           <Alert>
-            <AlertTitle>Created Issues</AlertTitle>
-            <AlertDescription>{pushedIssues.join(', ')}</AlertDescription>
+            <AlertTitle>Created Issues ({pushResult.createdIssues.length})</AlertTitle>
+            <AlertDescription>
+              {pushResult.createdIssues.map((issue) => issue.identifier).join(', ')}
+            </AlertDescription>
+          </Alert>
+        )}
+        {hasErrors && (
+          <Alert variant="destructive">
+            <AlertTitle>Errors</AlertTitle>
+            <AlertDescription>
+              <ul className="list-disc pl-4 space-y-1">
+                {pushResult.errors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+            </AlertDescription>
           </Alert>
         )}
         <Button onClick={() => router.push(`/generation/${id}`)}>Back to Generation</Button>
@@ -621,10 +670,10 @@ export default function ReviewAndPushPage() {
           </Button>
           <Button
             onClick={() => setPushDialog(true)}
-            disabled={hasUnsavedChanges || output.epics.length === 0}
+            disabled={hasUnsavedChanges || output.epics.length === 0 || !selectedTeamId}
           >
             <Send className="h-4 w-4 mr-2" />
-            Push to Linear
+            {selectedTeamId ? 'Push to Linear' : 'Select a team to push'}
           </Button>
         </div>
       </div>
@@ -671,11 +720,39 @@ export default function ReviewAndPushPage() {
               {totalStories} stor{totalStories !== 1 ? 'ies' : 'y'} in Linear.
             </DialogDescription>
           </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <label className="text-sm font-medium mb-1.5 block">Target Team</label>
+              {teams.length === 0 ? (
+                <Alert>
+                  <AlertDescription>
+                    No teams synced yet. Go to{' '}
+                    <button
+                      className="underline font-medium"
+                      onClick={() => router.push('/settings')}
+                    >
+                      Settings
+                    </button>{' '}
+                    and sync your Linear teams first.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Select
+                  value={selectedTeamId}
+                  onChange={(e) => setSelectedTeamId(e.target.value)}
+                  options={[
+                    { value: '', label: 'Select a team...' },
+                    ...teams.map((t) => ({ value: t.id, label: t.name })),
+                  ]}
+                />
+              )}
+            </div>
+          </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setPushDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={handlePush} disabled={pushing}>
+            <Button onClick={handlePush} disabled={pushing || !selectedTeamId}>
               {pushing ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
