@@ -1,31 +1,37 @@
 """Linear endpoints: validate and push structured output to Linear."""
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from gamole_types import GeneratedOutput, LinearPushConfig
 
 from ..auth.middleware import auth_dependency
+from ..config import settings
 
 router = APIRouter()
 
 
 class ValidateBody(BaseModel):
     output: GeneratedOutput
-    config: LinearPushConfig
+    config: LinearPushConfig = Field(default_factory=LinearPushConfig)
+
+    model_config = {"populate_by_name": True}
 
 
 class PushBody(BaseModel):
     output: GeneratedOutput
-    config: LinearPushConfig
-    token: str
+    config: LinearPushConfig = Field(default_factory=LinearPushConfig)
+    token: str | None = None
+
+    model_config = {"populate_by_name": True}
 
 
 class PushFromGenerationBody(BaseModel):
-    generation_id: str
-    config: LinearPushConfig
-    token: str
+    generation_id: str = Field(alias="generationId")
+    config: LinearPushConfig = Field(default_factory=LinearPushConfig)
+    token: str | None = None
 
+    model_config = {"populate_by_name": True}
 
 @router.post("/linear/validate", dependencies=[Depends(auth_dependency)])
 async def validate_push(body: ValidateBody):
@@ -45,7 +51,14 @@ async def push_to_linear_endpoint(body: PushBody):
     """Push pre-structured output to Linear. Teams resolved per-epic from AI recommendations."""
     from gamole_linear.push import push_to_linear
 
-    result = await push_to_linear(body.output, body.config, body.token)
+    token = body.token or settings.linear_api_token
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No Linear token provided and none configured (LINEAR_API_TOKEN env)",
+        )
+
+    result = await push_to_linear(body.output, body.config, token)
     return result.model_dump(by_alias=True)
 
 
@@ -57,6 +70,13 @@ async def push_generation_to_linear(body: PushFromGenerationBody):
 
     from gamole_db import Workflow, get_session
     from gamole_db.models import DocumentVersion as DocumentVersionModel
+
+    token = body.token or settings.linear_api_token
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail="No Linear token provided and none configured (LINEAR_API_TOKEN env)",
+        )
 
     async for session in get_session():
         wf = await session.get(Workflow, _uuid.UUID(body.generation_id))
@@ -71,7 +91,7 @@ async def push_generation_to_linear(body: PushFromGenerationBody):
 
         from gamole_linear.push import push_to_linear
 
-        result = await push_to_linear(output, body.config, body.token)
+        result = await push_to_linear(output, body.config, token)
 
         # Store original generated stories as AI_FINAL document version (for feedback tracking)
         dv = DocumentVersionModel(

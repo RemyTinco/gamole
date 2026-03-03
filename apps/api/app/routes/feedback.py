@@ -4,7 +4,7 @@ import json
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
 from ..auth.middleware import auth_dependency
@@ -13,9 +13,10 @@ router = APIRouter()
 
 
 class FeedbackInput(BaseModel):
-    edited_stories: list[dict]
+    edited_stories: list[dict] = Field(alias="editedStories")
     notes: str | None = None
 
+    model_config = {"populate_by_name": True}
 
 @router.post("/feedback/{generation_id}", dependencies=[Depends(auth_dependency)])
 async def submit_feedback(generation_id: str, body: FeedbackInput):
