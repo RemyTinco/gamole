@@ -15,6 +15,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, StateGraph
 
 from gamole_ai.agents.dev import run as run_dev
+from gamole_ai.agents.discovery import generate_questions
 from gamole_ai.agents.draft import run as run_draft
 from gamole_ai.agents.po import run as run_po
 from gamole_ai.agents.qa import run as run_qa
@@ -34,6 +35,8 @@ class WorkflowState(TypedDict):
     quality_score: float
     status: str
     structured_output: dict[str, Any] | None
+    discovery_questions: list[dict] | None
+    discovery_answers: list[dict] | None
     # Parallel review results
     qa_critique: str | None
     dev_critique: str | None
@@ -62,6 +65,17 @@ async def retrieve_context_node(state: WorkflowState) -> dict:
     return {
         "context": bundle.model_dump(by_alias=True),
         "status": "CONTEXT_RETRIEVED",
+    }
+
+
+async def discovery_node(state: WorkflowState) -> dict:
+    result = await generate_questions(state["input"], json.dumps(state["context"]))
+    input_tokens = _estimate_tokens(state["input"] + json.dumps(state["context"]))
+    output_tokens = _estimate_tokens(str([q.text for q in result.questions]))
+    track_usage("discovery", input_tokens, output_tokens)
+    return {
+        "discovery_questions": [q.model_dump() for q in result.questions],
+        "status": "AWAITING_DISCOVERY",
     }
 
 
@@ -217,6 +231,14 @@ graph.add_edge("structure", END)
 
 workflow = graph.compile()
 
+discovery_graph = StateGraph(WorkflowState)
+discovery_graph.add_node("retrieve_context", retrieve_context_node)
+discovery_graph.add_node("discovery", discovery_node)
+discovery_graph.set_entry_point("retrieve_context")
+discovery_graph.add_edge("retrieve_context", "discovery")
+discovery_graph.add_edge("discovery", END)
+discovery_workflow = discovery_graph.compile()
+
 # Separate graph for the finalize step (structure only)
 finalize_graph = StateGraph(WorkflowState)
 finalize_graph.add_node("structure", structure_node)
@@ -236,6 +258,8 @@ async def run_workflow(input_text: str) -> dict:
         "quality_score": 0,
         "status": "INITIALIZED",
         "structured_output": None,
+        "discovery_questions": None,
+        "discovery_answers": None,
         "qa_critique": None,
         "dev_critique": None,
         "po_critique": None,
