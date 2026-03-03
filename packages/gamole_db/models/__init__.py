@@ -88,6 +88,15 @@ class Workflow(Base):
     document: Mapped[str | None] = mapped_column(Text, nullable=True)
     agent_rounds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     state_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # state_json structure for discovery step:
+    # {
+    #   "discovery": {
+    #     "questions": [{"id": "q1", "text": "...", "placeholder": "..."}],
+    #     "answers": [{"question_id": "q1", "answer": "..."}],
+    #     "context": {...},  # serialized RAG context bundle
+    #     "enriched_document": "..."  # document after enrichment
+    #   }
+    # }
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 

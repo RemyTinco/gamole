@@ -1,6 +1,14 @@
 """Re-export all schemas."""
 
 from .agent import AgentResult, CodeChunk, ContextBundle, LinearArtifact
+from .discovery import (
+    DiscoveryAnswer,
+    DiscoveryAnswers,
+    DiscoveryEnrichmentInput,
+    DiscoveryEnrichmentOutput,
+    DiscoveryQuestion,
+    DiscoveryQuestionsOutput,
+)
 from .generated import GeneratedEpic, GeneratedOutput, GeneratedStory
 from .linear import LinearPushConfig, LinearPushResult
 from .quality import QualityFlag, QualityScore
@@ -16,6 +24,12 @@ __all__ = [
     "AgentResult",
     "CodeChunk",
     "ContextBundle",
+    "DiscoveryAnswer",
+    "DiscoveryAnswers",
+    "DiscoveryEnrichmentInput",
+    "DiscoveryEnrichmentOutput",
+    "DiscoveryQuestion",
+    "DiscoveryQuestionsOutput",
     "DocumentVersion",
     "DocumentVersionType",
     "GeneratedEpic",

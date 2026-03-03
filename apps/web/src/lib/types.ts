@@ -7,6 +7,7 @@ export interface Generation {
   error?: string | null
   costBreakdown?: CostBreakdown | null
   input?: string | null
+  discoveryQuestions?: DiscoveryQuestion[] | null
 }
 
 export interface GeneratedOutput {
@@ -38,8 +39,19 @@ export interface CostBreakdown {
   perAgent: Record<string, { inputTokens: number; outputTokens: number; costUsd: number }>
 }
 
+export interface DiscoveryQuestion {
+  id: string
+  text: string
+  placeholder?: string | null
+}
+
+export interface DiscoveryAnswer {
+  questionId: string
+  answer: string
+}
+
 export interface GenerationEvent {
-  type: "status" | "progress" | "user_edit_required" | "complete" | "error" | "heartbeat"
+  type: "status" | "progress" | "user_edit_required" | "complete" | "error" | "heartbeat" | "discovery_questions"
   data: Record<string, unknown>
   timestamp: string
 }

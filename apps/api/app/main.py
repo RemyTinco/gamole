@@ -50,6 +50,17 @@ async def lifespan(app: FastAPI):
                 " END $$"
             )
         )
+        # Ensure workflow_status enum has AWAITING_DISCOVERY value
+        await conn.execute(
+            sqlalchemy.text(
+                "DO $$ BEGIN"
+                " IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'AWAITING_DISCOVERY'"
+                " AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'workflow_status'))"
+                " THEN ALTER TYPE workflow_status ADD VALUE 'AWAITING_DISCOVERY';"
+                " END IF;"
+                " END $$"
+            )
+        )
         # Add missing columns to existing tables (safe: IF NOT EXISTS)
         migrations = [
             "ALTER TABLE workflows ADD COLUMN IF NOT EXISTS cost_breakdown JSONB",
