@@ -97,8 +97,3 @@ export interface SyncStatus {
   lastSyncMetadata: Record<string, unknown> | null
 }
 
-export interface FeedbackStats {
-  totalGenerations: number
-  totalFeedback: number
-  mostEditedFields: Record<string, number>
-}

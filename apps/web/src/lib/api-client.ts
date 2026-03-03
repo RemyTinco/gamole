@@ -7,7 +7,6 @@ import type {
   Team,
   ChatResponse,
   SyncStatus,
-  FeedbackStats,
 } from "./types"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -195,14 +194,6 @@ export async function codebaseSync() {
   return api.post("api/sync/codebase").json()
 }
 
-// Feedback
-export async function submitFeedback(generationId: string, data: Record<string, unknown>) {
-  return api.post("api/feedback", { json: { generationId, ...data } }).json()
-}
-
-export async function getFeedbackStats() {
-  return api.get("api/feedback/stats").json<FeedbackStats>()
-}
 
 // Admin
 export async function getAdminMetrics() {

@@ -2,8 +2,8 @@
 
 import logging
 from contextlib import asynccontextmanager
-import sqlalchemy
 
+import sqlalchemy
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -15,7 +15,6 @@ from .routes import (
     admin,
     chat,
     context,
-    feedback,
     generation,
     health,
     linear,
@@ -86,7 +85,7 @@ app.include_router(generation.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
 app.include_router(context.router, prefix="/api")
 app.include_router(linear.router, prefix="/api")
-app.include_router(feedback.router, prefix="/api")
+app.include_router(chat.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(repositories.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")

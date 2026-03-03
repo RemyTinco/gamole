@@ -22,10 +22,10 @@ AI-powered ticket refinement engine. Takes rough feature requests, runs them thr
                     │  │ Workflow  │  │ + LiteLLM  │  │ RAG      │ │
                     │  └──────────┘  └────────────┘  └──────────┘ │
                     │                                              │
-                    │  ┌──────────┐  ┌────────────┐  ┌──────────┐ │
-                    │  │ Linear   │  │ GitHub     │  │ Feedback │ │
-                    │  │ GraphQL  │  │ Codebase   │  │ Tracking │ │
-                    │  └──────────┘  └────────────┘  └──────────┘ │
+                    │  ┌──────────┐  ┌────────────┐               │
+                    │  │ Linear   │  │ GitHub     │               │
+                    │  │ GraphQL  │  │ Codebase   │               │
+                    │  └──────────┘  └────────────┘               │
                     └──────────────────────────────────────────────┘
 ```
 
@@ -205,15 +205,6 @@ The token payload contains `userId`, `iat`, and `exp`. Optionally includes `work
 | POST | `/api/teams/sync` | Import teams from Linear API |
 | POST | `/api/sync/linear` | Sync Linear issues to pgvector cache |
 
-### Other
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Health check |
-| POST | `/api/context` | Query RAG context directly |
-| POST | `/api/feedback/{id}` | Submit post-push feedback |
-| GET | `/api/feedback/stats` | Feedback statistics |
-
 ## Key Features
 
 ### Per-epic team routing
@@ -231,10 +222,6 @@ After AI approval, the workflow pauses in `USER_EDITING` state. Edit the documen
 ### Chat with Linear
 
 Ask questions like "How many tickets did Nelly create last 3 weeks?" or "What's blocked in origination?" The LLM converts to GraphQL, executes against Linear's API, self-corrects on errors, and returns a natural language answer with sources.
-
-### Feedback loop
-
-Track which stories get edited after Linear push. Submit feedback via the API. Statistics endpoint shows what changes most, informing future prompt improvements.
 
 ## Project Structure
 
@@ -254,6 +241,17 @@ packages/
   gamole_linear/      # Linear GraphQL client, batch push, sync
   gamole_types/       # Pydantic schemas (shared types)
 ```
+
+## Later Improvements
+
+Features planned but not yet implemented:
+
+- **Feedback loop**: Track which stories get edited after Linear push. Submit feedback via the API to identify which AI output fields need improvement. Show statistics on what changes most to inform prompt tuning. (Backend scaffolding exists in DB schema — `DocumentVersion.feedback_json` column and `FEEDBACK` type enum are ready.)
+- **Codebase sync scheduling**: Automatic periodic re-indexing of repositories (currently manual only)
+- **Codebase orphan cleanup**: Detect and remove chunks for deleted/renamed files during re-indexing
+- **Diff-based indexing**: Only re-index changed files instead of full repository walks
+- **Push response codes**: Return 207 Multi-Status or `ok: false` when some issues fail to push
+
 
 ## License
 

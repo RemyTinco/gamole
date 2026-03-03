@@ -91,18 +91,3 @@ def test_finalize_not_found(client, auth_headers):
     )
     assert resp.status_code == 404
 
-
-@requires_db
-def test_feedback_stats_endpoint(client, auth_headers):
-    resp = client.get("/api/feedback/stats", headers=auth_headers)
-    assert resp.status_code == 200
-
-
-@requires_db
-def test_feedback_not_found(client, auth_headers):
-    resp = client.post(
-        "/api/feedback/00000000-0000-0000-0000-000000000000",
-        json={"edited_stories": [], "notes": "test"},
-        headers=auth_headers,
-    )
-    assert resp.status_code in (404, 500)

@@ -4,14 +4,14 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useState } from "react"
 import { useTheme } from "next-themes"
-import { LayoutDashboard, Sparkles, Settings, MessageSquare, BarChart3, Sun, Moon, Menu, X } from "lucide-react"
+import { LayoutDashboard, Sparkles, Settings, MessageSquare, Sun, Moon, Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const links = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/generate", label: "Generate", icon: Sparkles },
   { href: "/chat", label: "Chat", icon: MessageSquare },
-  { href: "/feedback", label: "Feedback", icon: BarChart3 },
+  { href: "/settings", label: "Settings", icon: Settings },
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
