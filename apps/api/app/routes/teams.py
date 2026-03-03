@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
@@ -121,7 +121,8 @@ async def remove_team(team_id: str):
 
 
 @router.post("/teams/sync", dependencies=[Depends(auth_dependency)])
-async def sync_teams_from_linear(body: SyncTeamsBody):
+async def sync_teams_from_linear(body: SyncTeamsBody = Body(default=None)):
+    body = body or SyncTeamsBody()
     """Fetch all teams from Linear and upsert them. Preserves existing descriptions."""
     import httpx
 

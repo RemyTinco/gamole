@@ -24,9 +24,9 @@ from .routes import (
     teams,
 )
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.rate_limit_per_minute}/minute"])
-
-
+limiter = Limiter(
+    key_func=get_remote_address, default_limits=[f"{settings.rate_limit_per_minute}/minute"]
+)
 
 logger = logging.getLogger(__name__)
 
@@ -41,14 +41,16 @@ async def lifespan(app: FastAPI):
         # Create tables/enums first so ALTER TYPE can find them
         await conn.run_sync(Base.metadata.create_all)
         # Ensure enum values are up-to-date (safe to run repeatedly)
-        await conn.execute(sqlalchemy.text(
-            "DO $$ BEGIN"
-            " IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'FEEDBACK'"
-            " AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'document_version_type'))"
-            " THEN ALTER TYPE document_version_type ADD VALUE 'FEEDBACK';"
-            " END IF;"
-            " END $$"
-        ))
+        await conn.execute(
+            sqlalchemy.text(
+                "DO $$ BEGIN"
+                " IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'FEEDBACK'"
+                " AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'document_version_type'))"
+                " THEN ALTER TYPE document_version_type ADD VALUE 'FEEDBACK';"
+                " END IF;"
+                " END $$"
+            )
+        )
         # Add missing columns to existing tables (safe: IF NOT EXISTS)
         migrations = [
             "ALTER TABLE workflows ADD COLUMN IF NOT EXISTS cost_breakdown JSONB",
