@@ -124,9 +124,7 @@ class TestPushGenerationEndpoint:
 
     def test_push_generation_camelcase_body(self, client, auth_headers):
         """Regression: camelCase generationId must NOT return 422."""
-        fake_get_session, _ = _mock_db_session_with_workflow(
-            structured_output=_VALID_STRUCTURED_OUTPUT
-        )
+        fake_get_session, _ = _mock_db_session_with_workflow(structured_output=_VALID_STRUCTURED_OUTPUT)
         mock_push = _mock_push_to_linear()
 
         with (
@@ -145,9 +143,7 @@ class TestPushGenerationEndpoint:
 
     def test_push_generation_snake_case_body(self, client, auth_headers):
         """snake_case generation_id should also work (populate_by_name)."""
-        fake_get_session, _ = _mock_db_session_with_workflow(
-            structured_output=_VALID_STRUCTURED_OUTPUT
-        )
+        fake_get_session, _ = _mock_db_session_with_workflow(structured_output=_VALID_STRUCTURED_OUTPUT)
         mock_push = _mock_push_to_linear()
 
         with (
@@ -166,9 +162,7 @@ class TestPushGenerationEndpoint:
 
     def test_push_generation_minimal_body(self, client, auth_headers):
         """Only generationId is required — config and token should fall back to defaults."""
-        fake_get_session, _ = _mock_db_session_with_workflow(
-            structured_output=_VALID_STRUCTURED_OUTPUT
-        )
+        fake_get_session, _ = _mock_db_session_with_workflow(structured_output=_VALID_STRUCTURED_OUTPUT)
         mock_push = _mock_push_to_linear()
 
         with (
@@ -186,9 +180,7 @@ class TestPushGenerationEndpoint:
 
     def test_push_generation_with_explicit_token(self, client, auth_headers):
         """Explicit token in body should be used."""
-        fake_get_session, _ = _mock_db_session_with_workflow(
-            structured_output=_VALID_STRUCTURED_OUTPUT
-        )
+        fake_get_session, _ = _mock_db_session_with_workflow(structured_output=_VALID_STRUCTURED_OUTPUT)
         mock_push = _mock_push_to_linear()
 
         with (
@@ -207,9 +199,7 @@ class TestPushGenerationEndpoint:
 
     def test_push_generation_with_config(self, client, auth_headers):
         """Config with camelCase fields should be accepted."""
-        fake_get_session, _ = _mock_db_session_with_workflow(
-            structured_output=_VALID_STRUCTURED_OUTPUT
-        )
+        fake_get_session, _ = _mock_db_session_with_workflow(structured_output=_VALID_STRUCTURED_OUTPUT)
         mock_push = _mock_push_to_linear()
 
         with (
