@@ -38,6 +38,8 @@ async def lifespan(app: FastAPI):
 
     async with engine.begin() as conn:
         await conn.execute(sqlalchemy.text("CREATE EXTENSION IF NOT EXISTS vector"))
+        # Create tables/enums first so ALTER TYPE can find them
+        await conn.run_sync(Base.metadata.create_all)
         # Ensure enum values are up-to-date (safe to run repeatedly)
         await conn.execute(sqlalchemy.text(
             "DO $$ BEGIN"
@@ -56,7 +58,6 @@ async def lifespan(app: FastAPI):
         ]
         for sql in migrations:
             await conn.execute(sqlalchemy.text(sql))
-        await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables verified/created")
     yield
 
