@@ -74,17 +74,12 @@ async def _get_or_create_workspace(session) -> tuple:
     return workspace.id
 
 
-async def _run_generation(generation_id: str, input_text: str) -> None:
-    """Background task: run the LangGraph workflow and emit progress events."""
+async def _run_main_workflow(generation_id: str, input_text: str, document: str, context: dict) -> None:
+    """Background task: run the main LangGraph workflow after discovery answers submitted."""
     global _active_generation
-    import sys
-
-    sys.path.insert(0, "/tmp/gamole/apps/api")
-
     from gamole_ai.cost_tracker import CostTracker, set_tracker
     from gamole_db import Workflow, get_session
 
-    # Set up cost tracker
     tracker = CostTracker()
     ctx_token = set_tracker(tracker)
 
@@ -94,18 +89,20 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
         _emit(generation_id, "status", {
             "generationId": generation_id,
             "status": "running",
-            "message": "Starting workflow",
+            "message": "Starting main workflow",
         })
 
         initial_state: WorkflowState = {
             "input": input_text,
-            "document": input_text,
-            "context": {},
+            "document": document,
+            "context": context,
             "round": 0,
             "critiques": [],
             "quality_score": 0,
-            "status": "INITIALIZED",
+            "status": "CONTEXT_RETRIEVED",
             "structured_output": None,
+            "discovery_questions": None,
+            "discovery_answers": None,
             "qa_critique": None,
             "dev_critique": None,
             "po_critique": None,
@@ -114,11 +111,10 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
             "po_doc": None,
         }
 
-        last_status = "INITIALIZED"
-        final_document = input_text
+        last_status = "CONTEXT_RETRIEVED"
+        final_document = document
         final_quality_score = 0.0
 
-        # Stream workflow execution via astream
         async for chunk in workflow.astream(initial_state):
             for node_name, update in chunk.items():
                 new_status = update.get("status", last_status)
@@ -131,7 +127,6 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
                         "round": update.get("round", 0),
                         "qualityScore": update.get("quality_score", 0),
                     })
-
                 if update.get("document"):
                     final_document = update["document"]
                 if update.get("quality_score"):
@@ -147,7 +142,6 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
                 wf.cost_breakdown = tracker.to_dict()
                 await session.commit()
 
-        # Emit user_edit_required event
         _emit(generation_id, "user_edit_required", {
             "generationId": generation_id,
             "message": "Document ready for review. Edit and finalize when ready.",
@@ -155,7 +149,6 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
         })
 
     except Exception as e:
-        # Update DB with failure
         try:
             async for session in get_session():
                 wf = await session.get(Workflow, uuid.UUID(generation_id))
@@ -165,16 +158,107 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
                     await session.commit()
         except Exception:
             pass
-
         _emit(generation_id, "error", {
             "generationId": generation_id,
             "error": str(e),
         })
     finally:
         from gamole_ai.cost_tracker import clear_tracker
+
         clear_tracker(ctx_token)
         _active_generation = None
 
+
+async def _run_generation(generation_id: str, input_text: str) -> None:
+    """Background task: run the discovery LangGraph workflow and emit discovery questions."""
+    global _active_generation
+    import sys
+
+    sys.path.insert(0, "/tmp/gamole/apps/api")
+
+    from gamole_ai.cost_tracker import CostTracker, set_tracker
+    from gamole_db import Workflow, get_session
+
+    # Set up cost tracker
+    tracker = CostTracker()
+    ctx_token = set_tracker(tracker)
+
+    try:
+        from app.orchestrator.graph import WorkflowState, discovery_workflow
+
+        _emit(generation_id, "status", {
+            "generationId": generation_id,
+            "status": "running",
+            "message": "Starting discovery",
+        })
+
+        initial_state: WorkflowState = {
+            "input": input_text,
+            "document": input_text,
+            "context": {},
+            "round": 0,
+            "critiques": [],
+            "quality_score": 0,
+            "status": "INITIALIZED",
+            "structured_output": None,
+            "discovery_questions": None,
+            "discovery_answers": None,
+            "qa_critique": None,
+            "dev_critique": None,
+            "po_critique": None,
+            "qa_doc": None,
+            "dev_doc": None,
+            "po_doc": None,
+        }
+
+        final_questions: list = []
+        final_context: dict = {}
+
+        async for chunk in discovery_workflow.astream(initial_state):
+            for _node_name, update in chunk.items():
+                if update.get("discovery_questions"):
+                    final_questions = update["discovery_questions"]
+                if update.get("context"):
+                    final_context = update["context"]
+
+        # Persist to DB with AWAITING_DISCOVERY status
+        async for session in get_session():
+            wf = await session.get(Workflow, uuid.UUID(generation_id))
+            if wf:
+                wf.status = "AWAITING_DISCOVERY"
+                wf.state_json = {
+                    "discovery": {
+                        "questions": final_questions,
+                        "context": final_context,
+                    }
+                }
+                await session.commit()
+
+        # Emit discovery questions event
+        _emit(generation_id, "discovery_questions", {"questions": final_questions})
+
+        # Release lock — user may take minutes/hours to answer
+        _active_generation = None
+
+    except Exception as e:
+        try:
+            async for session in get_session():
+                wf = await session.get(Workflow, uuid.UUID(generation_id))
+                if wf:
+                    wf.status = "FAILED"
+                    wf.cost_breakdown = tracker.to_dict()
+                    await session.commit()
+        except Exception:
+            pass
+        _emit(generation_id, "error", {
+            "generationId": generation_id,
+            "error": str(e),
+        })
+        _active_generation = None
+    finally:
+        from gamole_ai.cost_tracker import clear_tracker
+
+        clear_tracker(ctx_token)
 
 class GenerationInput(BaseModel):
     input: str
@@ -256,6 +340,7 @@ async def get_generation(generation_id: str):
                 "qualityScore": wf.quality_score,
                 "costBreakdown": _format_cost(wf.cost_breakdown),
                 "error": None,
+                "discoveryQuestions": (wf.state_json or {}).get("discovery", {}).get("questions"),
             }
     except HTTPException:
         raise
@@ -371,6 +456,8 @@ async def finalize_generation(generation_id: str):
             "quality_score": 0,
             "status": "USER_EDITING",
             "structured_output": None,
+            "discovery_questions": None,
+            "discovery_answers": None,
             "qa_critique": None,
             "dev_critique": None,
             "po_critique": None,
@@ -419,6 +506,88 @@ async def finalize_generation(generation_id: str):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         clear_tracker(ctx_token)
+
+
+class DiscoveryAnswersInput(BaseModel):
+    answers: list[dict]
+
+
+@router.post("/generation/{generation_id}/discovery-answers", dependencies=[Depends(auth_dependency)])
+async def submit_discovery_answers(generation_id: str, body: DiscoveryAnswersInput):
+    """Submit answers to discovery questions and resume the main workflow."""
+    global _active_generation
+    from gamole_db import Workflow, get_session
+
+    # Load workflow from DB
+    questions: list = []
+    context: dict = {}
+    input_text = ""
+    async for session in get_session():
+        wf = await session.get(Workflow, uuid.UUID(generation_id))
+        if not wf:
+            raise HTTPException(status_code=404, detail="Generation not found")
+        if wf.status != "AWAITING_DISCOVERY":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Generation is {wf.status}, not AWAITING_DISCOVERY",
+            )
+
+        # Load discovery data from state_json
+        discovery_data = (wf.state_json or {}).get("discovery", {})
+        questions = discovery_data.get("questions", [])
+        context = discovery_data.get("context", {})
+
+        # Validate answer count
+        if len(body.answers) != len(questions):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Expected {len(questions)} answers, got {len(body.answers)}",
+            )
+
+        # Validate non-empty answers
+        for ans in body.answers:
+            if not ans.get("answer", "").strip():
+                raise HTTPException(status_code=422, detail="All answers must be non-empty")
+
+        input_text = wf.input_text
+
+    # Call enrich_document
+    from gamole_ai.agents.discovery import enrich_document
+    from gamole_types.schemas.discovery import (
+        DiscoveryAnswer,
+        DiscoveryEnrichmentInput,
+        DiscoveryQuestion,
+    )
+
+    discovery_questions = [DiscoveryQuestion(**q) for q in questions]
+    discovery_answers = [DiscoveryAnswer(**a) for a in body.answers]
+    enrich_input = DiscoveryEnrichmentInput(
+        original_input=input_text,
+        context=json.dumps(context),
+        questions=discovery_questions,
+        answers=discovery_answers,
+    )
+    enrichment_result = await enrich_document(enrich_input)
+    enriched_document = enrichment_result.enriched_document
+
+    # Persist enriched document + answers to DB
+    async for session in get_session():
+        wf = await session.get(Workflow, uuid.UUID(generation_id))
+        if wf:
+            wf.document = enriched_document
+            wf.status = "RUNNING"
+            existing_state = wf.state_json or {}
+            existing_state.setdefault("discovery", {})
+            existing_state["discovery"]["answers"] = [a.model_dump() for a in discovery_answers]
+            existing_state["discovery"]["enriched_document"] = enriched_document
+            wf.state_json = existing_state
+            await session.commit()
+
+    # Re-acquire lock and spawn main workflow
+    _active_generation = {"id": generation_id}
+    asyncio.create_task(_run_main_workflow(generation_id, input_text, enriched_document, context))
+
+    return {"status": "running"}
 
 
 @router.get("/generation/{generation_id}/stream")
