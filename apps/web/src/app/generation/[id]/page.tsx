@@ -7,7 +7,7 @@ import { useGenerationStream } from "@/hooks/use-generation-stream"
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Textarea } from "@/components/ui/textarea"
+import { Editor } from "@/components/editor"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Check, Circle, Loader2, Send, Save, ChevronDown, ChevronRight, AlertCircle, DollarSign } from "lucide-react"
@@ -156,7 +156,7 @@ export default function GenerationDetailPage({
             )}
           </CardHeader>
           <CardContent>
-            <Textarea value={editDoc} onChange={(e) => setEditDoc(e.target.value)} rows={20} className="font-mono text-sm" />
+            <Editor content={editDoc} onChange={setEditDoc} markdown minHeight="400px" />
           </CardContent>
           <CardFooter className="gap-2">
             <Button onClick={handleSave} disabled={saving} variant="outline">
@@ -176,7 +176,7 @@ export default function GenerationDetailPage({
         <Card>
           <CardHeader><CardTitle>Document</CardTitle></CardHeader>
           <CardContent>
-            <pre className="whitespace-pre-wrap text-sm font-mono bg-muted p-4 rounded-md max-h-96 overflow-auto">{gen.document}</pre>
+            <Editor content={gen.document} onChange={() => {}} markdown readOnly minHeight="200px" />
           </CardContent>
         </Card>
       )}
