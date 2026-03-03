@@ -132,6 +132,44 @@ uv run ruff check packages/ apps/api/   # linting
 
 DB-dependent tests skip automatically when PostgreSQL isn't running.
 
+### Authentication
+
+The API uses JWT bearer tokens for authentication. All `/api/*` routes (except `/health`) require a valid token in the `Authorization` header.
+
+**How it works:**
+
+1. A JWT is created with `create_session(user_id, workspace_id)` from `apps/api/app/auth/jwt.py`
+2. The token is signed with `SESSION_SECRET` (HS256) and expires after 7 days
+3. Clients send it as `Authorization: Bearer <token>`
+4. The `auth_dependency` middleware decodes and validates the token on every protected request
+
+**Generate a dev token:**
+
+```bash
+# From the project root (requires the API container running)
+docker compose exec api python -c "
+from app.auth.jwt import create_session
+print(create_session(user_id='dev-user'))"
+```
+
+Or without Docker:
+
+```bash
+cd apps/api
+PYTHONPATH=.:../../ python -c "
+from app.auth.jwt import create_session
+print(create_session(user_id='dev-user'))"
+```
+
+**Use the token:**
+
+```bash
+TOKEN="<paste token here>"
+curl http://localhost:3001/api/generation -H "Authorization: Bearer $TOKEN"
+```
+
+The token payload contains `userId`, `iat`, and `exp`. Optionally includes `workspaceId` if provided at creation.
+
 ## API Endpoints
 
 ### Generation (ticket refinement)
