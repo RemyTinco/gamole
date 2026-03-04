@@ -462,10 +462,13 @@ export default function ReviewAndPushPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-medium text-muted-foreground mb-1 block">Team</label>
-                    <Input
+                    <Select
                       value={epic.teamName || ''}
                       onChange={(e) => updateEpic(epicIndex, { teamName: e.target.value || null })}
-                      placeholder="Team name"
+                      options={[
+                        { value: '', label: 'Select a team...' },
+                        ...teams.map((t) => ({ value: t.name, label: t.name })),
+                      ]}
                     />
                   </div>
                   <div>

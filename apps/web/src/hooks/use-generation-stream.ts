@@ -32,8 +32,7 @@ export function useGenerationStream(id: string | null) {
 
   const connect = useCallback(() => {
     if (!id) return
-    const token = localStorage.getItem("gamole_token")
-    const url = `${API_BASE}/api/generation/${id}/stream${token ? `?token=${token}` : ""}`
+    const url = `${API_BASE}/api/generation/${id}/stream`
     const es = new EventSource(url)
     esRef.current = es
 

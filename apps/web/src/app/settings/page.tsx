@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea"
 import {
   listRepositories, addRepository, deleteRepository, indexRepository, listGithubRepos,
-  listTeams, syncTeams, updateTeam,
+  listTeams, syncTeams, updateTeam, deleteTeam,
   getLinearSyncStatus, linearSync, setLinearSchedule, getLinearSchedule,
   getHealth
 } from "@/lib/api-client"
@@ -247,7 +247,20 @@ function TeamsTab() {
                   <span className="font-medium text-sm">{team.name}</span>
                   <p className="text-xs text-muted-foreground">{team.description || "No description"}</p>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => { setEditTeam(team); setEditDesc(team.description) }}>Edit</Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => { setEditTeam(team); setEditDesc(team.description) }}>Edit</Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-destructive hover:text-destructive"
+                    onClick={async () => {
+                      try { await deleteTeam(team.id); toast.success(`${team.name} deleted`); mutate() }
+                      catch { toast.error('Failed to delete team') }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}

@@ -159,7 +159,7 @@ export function Editor({ content, onChange, markdown = false, minHeight = '300px
       {/* Editor */}
       <EditorContent
         editor={editor}
-        className={`prose prose-sm dark:prose-invert max-w-none p-4 focus:outline-none [&_.ProseMirror]:outline-none`}
+        className={`prose dark:prose-invert max-w-none p-4 focus:outline-none [&_.ProseMirror]:outline-none`}
         style={{ minHeight }}
       />
     </div>

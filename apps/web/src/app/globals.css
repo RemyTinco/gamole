@@ -35,3 +35,34 @@
     --accent-foreground: 210 40% 98%;
   }
 }
+
+/* TipTap / ProseMirror editor typography overrides */
+@layer components {
+  .ProseMirror {
+    outline: none;
+  }
+
+  .ProseMirror > * + * {
+    margin-top: 0.75em;
+  }
+
+  .ProseMirror h1 + *,
+  .ProseMirror h2 + *,
+  .ProseMirror h3 + * {
+    margin-top: 0.5em;
+  }
+
+  .ProseMirror > * + h1,
+  .ProseMirror > * + h2,
+  .ProseMirror > * + h3 {
+    margin-top: 1.5em;
+  }
+
+  .ProseMirror p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    float: left;
+    color: hsl(var(--foreground) / 0.4);
+    pointer-events: none;
+    height: 0;
+  }
+}

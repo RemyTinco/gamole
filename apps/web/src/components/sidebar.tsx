@@ -12,7 +12,6 @@ const links = [
   { href: "/generate", label: "Generate", icon: Sparkles },
   { href: "/chat", label: "Chat", icon: MessageSquare },
   { href: "/settings", label: "Settings", icon: Settings },
-  { href: "/settings", label: "Settings", icon: Settings },
 ]
 
 export function Sidebar() {
