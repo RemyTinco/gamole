@@ -21,6 +21,9 @@ class CodeChunk(BaseModel):
     similarity: float
     domain: str | None = None
     artifact_type: str | None = Field(default=None, alias="artifactType")
+    symbol_name: str | None = Field(default=None, alias="symbolName")
+    parent_symbol: str | None = Field(default=None, alias="parentSymbol")
+    score: float | None = Field(default=None)
 
     model_config = {"populate_by_name": True}
 
@@ -39,6 +42,7 @@ class ContextBundle(BaseModel):
     repositories: list[RepositorySummary] = Field(default_factory=list)
     key_facts: list[str] = Field(default_factory=list, alias="keyFacts")
     gaps: list[str] = Field(default_factory=list)
+    formatted_context: str | None = Field(default=None, alias="formattedContext")
 
     model_config = {"populate_by_name": True}
 

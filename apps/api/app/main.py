@@ -12,9 +12,7 @@ from slowapi.util import get_remote_address
 
 from .config import settings
 from .routes import (
-    admin,
     chat,
-    context,
     generation,
     health,
     linear,
@@ -66,7 +64,13 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE workflows ADD COLUMN IF NOT EXISTS cost_breakdown JSONB",
             "ALTER TABLE workflows ADD COLUMN IF NOT EXISTS structured_output JSONB",
             "ALTER TABLE workflows ADD COLUMN IF NOT EXISTS document TEXT",
-            "ALTER TABLE document_versions ADD COLUMN IF NOT EXISTS feedback_json JSONB",
+            "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS symbol_name TEXT",
+            "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS content_hash TEXT",
+            "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS chunk_index INTEGER",
+            "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS parent_symbol TEXT",
+            "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS content_tsv tsvector",
+            "UPDATE codebase_chunks SET content_tsv = to_tsvector('simple', chunk_text) WHERE content_tsv IS NULL",
+            "CREATE INDEX IF NOT EXISTS codebase_chunks_tsv_idx ON codebase_chunks USING GIN(content_tsv)",
         ]
         for sql in migrations:
             await conn.execute(sqlalchemy.text(sql))
@@ -94,13 +98,10 @@ app.include_router(health.router)
 # Protected routes
 app.include_router(generation.router, prefix="/api")
 app.include_router(sync.router, prefix="/api")
-app.include_router(context.router, prefix="/api")
 app.include_router(linear.router, prefix="/api")
-app.include_router(chat.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
 app.include_router(repositories.router, prefix="/api")
 app.include_router(teams.router, prefix="/api")
-app.include_router(admin.router, prefix="/api")
 
 
 @app.exception_handler(404)

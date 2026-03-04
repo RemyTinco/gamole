@@ -23,6 +23,8 @@ dependencies = [
     "sse-starlette>=2.2.0",
     "slowapi>=0.1.9",
     "rapidfuzz>=3.0.0",
+    "tree-sitter>=0.25.0",
+    "tree-sitter-language-pack>=0.13.0",
 ]
 
 [project.optional-dependencies]

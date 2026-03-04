@@ -40,6 +40,27 @@ async def embed_text(text: str) -> list[float]:
     return await _with_retry(_do)
 
 
+async def embed_query(text: str) -> list[float]:
+    """Embed a query string for similarity search. Uses retrieval_query task type.
+
+    Use this at search time (NOT for indexing documents).
+    Documents should use embed_text() with retrieval_document task type.
+    """
+    if not os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY"):
+        return _mock_embedding()
+
+    async def _do():
+        from langchain_google_genai import GoogleGenerativeAIEmbeddings
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/gemini-embedding-001",
+            task_type="retrieval_query",
+        )
+        result = await embeddings.aembed_query(text)
+        return result[:EMBEDDING_DIMENSIONS]
+
+    return await _with_retry(_do)
+
+
 async def embed_batch(texts: list[str]) -> list[list[float]]:
     """Embed multiple texts. Returns list of 768-dim vectors."""
     if not os.environ.get("GOOGLE_GENERATIVE_AI_API_KEY"):

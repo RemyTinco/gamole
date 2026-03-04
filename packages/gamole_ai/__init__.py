@@ -11,7 +11,7 @@ from .agents import (
 from .agents.types import AgentInput, AgentOutput, SupervisorOutput
 from .codebase.classifier import ALLOWED_EXTENSIONS, classifyFile, isSecretFile
 from .codebase.indexer import REPO_LIMIT_ERROR_PREFIX, IndexStats, index_repository
-from .embeddings import EMBEDDING_DIMENSIONS, chunk_text, embed_batch, embed_text
+from .embeddings import EMBEDDING_DIMENSIONS, chunk_text, embed_batch, embed_query, embed_text
 from .overlap import OverlapResult, detect_overlaps
 from .quality import QualityFlags, compute_quality_score
 from .retrieval import RetrieveContextOptions, retrieve_context
@@ -33,6 +33,7 @@ __all__ = [
     "compute_quality_score",
     "detect_overlaps",
     "embed_batch",
+    "embed_query",
     "embed_text",
     "index_repository",
     "isSecretFile",

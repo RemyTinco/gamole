@@ -20,7 +20,7 @@ from sqlalchemy import (
     Text,
     func,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -280,9 +280,15 @@ class CodebaseChunk(Base):
     artifact_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedding = mapped_column(Vector(768), nullable=True)
     last_indexed_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
+    symbol_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chunk_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    parent_symbol: Mapped[str | None] = mapped_column(Text, nullable=True)
+    content_tsv = mapped_column(TSVECTOR, nullable=True)
 
     __table_args__ = (
         Index("codebase_chunks_embedding_idx", embedding, postgresql_using="hnsw", postgresql_ops={"embedding": "vector_cosine_ops"}),
+        Index("codebase_chunks_tsv_idx", "content_tsv", postgresql_using="gin"),
     )
 
 
