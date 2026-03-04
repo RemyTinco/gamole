@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 LANG_MAP: dict[str, str] = {
     "ts": "typescript",
-    "tsx": "typescript",
+    "tsx": "tsx",
     "js": "javascript",
     "jsx": "javascript",
     "py": "python",
@@ -26,6 +26,15 @@ ALLOWED_EXTENSIONS = {
     "ts", "tsx", "js", "jsx", "py", "go", "md", "yaml", "yml", "json",
 }
 
+
+def detect_language(file_path: str) -> str | None:
+    """Return tree-sitter language name for a file path, or None if unsupported.
+
+    Maps file extensions to tree-sitter language names.
+    Note: .tsx maps to 'tsx' (separate parser from 'typescript').
+    """
+    ext = file_path.rsplit(".", 1)[-1].lower() if "." in file_path else ""
+    return LANG_MAP.get(ext)
 
 @dataclass
 class FileClassification:
