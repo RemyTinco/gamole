@@ -15,7 +15,6 @@ from gamole_linear.push import push_to_linear
 from gamole_types import GeneratedOutput, LinearPushConfig
 from gamole_types.schemas.generated import GeneratedEpic, GeneratedStory
 
-
 # --- Helpers ---
 
 def _make_story(title: str = "Story 1", description: str = "Desc") -> GeneratedStory:

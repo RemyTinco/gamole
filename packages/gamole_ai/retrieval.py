@@ -49,7 +49,7 @@ async def retrieve_context(
         return EMPTY_BUNDLE
 
     try:
-        from sqlalchemy import select, text, literal_column
+        from sqlalchemy import literal_column, select, text
 
         from gamole_db import CodebaseChunk, LinearIssueCache, get_session
         from gamole_db.models import Repository
