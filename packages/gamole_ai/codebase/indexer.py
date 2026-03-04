@@ -4,14 +4,18 @@ G18: NO real-time indexing — called on a nightly schedule only.
 """
 
 import asyncio
+import hashlib
 import logging
 import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from sqlalchemy import func
+
 from ..embeddings import chunk_text, embed_batch
-from .classifier import ALLOWED_EXTENSIONS, classifyFile, isSecretFile
+from .ast_chunker import CodeChunkResult, chunk_code
+from .classifier import ALLOWED_EXTENSIONS, classifyFile, detect_language, isSecretFile
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,8 @@ class IndexStats:
     files_indexed: int = 0
     chunks_created: int = 0
     errors: int = 0
+    files_skipped: int = 0
+    orphans_deleted: int = 0
 
 
 def _repo_name_from_url(repo_url: str) -> str:
@@ -59,7 +65,7 @@ async def _clone_or_pull(repo_url: str, target_dir: str, branch: str | None = No
 
     if os.path.exists(target_dir):
         # Update remote URL in case token changed
-        await asyncio.create_subprocess_exec(
+        _ = await asyncio.create_subprocess_exec(
             "git", "-C", target_dir, "remote", "set-url", "origin", auth_url,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
@@ -67,7 +73,7 @@ async def _clone_or_pull(repo_url: str, target_dir: str, branch: str | None = No
             "git", "-C", target_dir, "pull",
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
-        await proc.wait()
+        _ = await proc.wait()
         return
 
     args = ["git", "clone", "--depth=1"]
@@ -104,7 +110,7 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
     # Load DB
     from sqlalchemy import and_, delete, select
 
-    from gamole_db import CodebaseChunk, get_session
+    from gamole_db import CodebaseChunk, get_session  # pyright: ignore[reportMissingTypeStubs]
 
     async for session in get_session():
         # Enforce repo cap
@@ -127,6 +133,7 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
 
         # Walk files
         file_paths = _walk_files(target_dir)
+        found_paths = {os.path.relpath(p, target_dir) for p in file_paths}
 
         # Process each file
         for abs_path in file_paths:
@@ -141,13 +148,42 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
             if isSecretFile(rel_path, content):
                 continue
 
+            content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+            existing_hash_result = await session.execute(
+                select(CodebaseChunk.content_hash)
+                .where(
+                    and_(
+                        CodebaseChunk.repo_name == repo_name,
+                        CodebaseChunk.file_path == rel_path,
+                    )
+                )
+                .limit(1)
+            )
+            existing_hash_row = existing_hash_result.first()
+            if existing_hash_row and existing_hash_row[0] == content_hash:
+                stats.files_skipped += 1
+                continue
+
             classification = classifyFile(rel_path)
-            chunks = [c for c in chunk_text(content) if c and c.strip()]
-            if not chunks:
+            language = detect_language(rel_path)
+            ast_chunks: list[CodeChunkResult] | None = None
+            if language:
+                ast_chunks = chunk_code(content, language, rel_path)
+
+            if ast_chunks is not None:
+                chunk_texts = [c.text for c in ast_chunks]
+                chunk_meta = ast_chunks
+            else:
+                raw_chunks = [c for c in chunk_text(content) if c and c.strip()]
+                chunk_texts = raw_chunks
+                chunk_meta = None
+
+            if not chunk_texts:
                 continue
 
             try:
-                embeddings = await embed_batch(chunks)
+                embeddings = await embed_batch(chunk_texts)
             except Exception:
                 logger.error(f"[codebase] Embed failed for {rel_path}", exc_info=True)
                 stats.errors += 1
@@ -155,7 +191,7 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
 
             # Delete old chunks for this file
             try:
-                await session.execute(
+                _ = await session.execute(
                     delete(CodebaseChunk).where(
                         and_(
                             CodebaseChunk.repo_name == repo_name,
@@ -167,13 +203,14 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
                 pass
 
             # Insert new chunks
-            for j, chunk_content in enumerate(chunks):
+            for j, chunk_content in enumerate(chunk_texts):
                 embedding = embeddings[j] if j < len(embeddings) else None
                 if not chunk_content or embedding is None:
                     stats.errors += 1
                     continue
 
                 try:
+                    meta = chunk_meta[j] if chunk_meta and j < len(chunk_meta) else None
                     session.add(CodebaseChunk(
                         repo_name=repo_name,
                         file_path=rel_path,
@@ -182,12 +219,30 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
                         domain=classification.domain,
                         artifact_type=classification.artifact_type,
                         embedding=embedding,
+                        content_hash=content_hash,
+                        chunk_index=meta.chunk_index if meta else j,
+                        symbol_name=meta.symbol_name if meta else None,
+                        parent_symbol=meta.parent_symbol if meta else None,
+                        content_tsv=func.to_tsvector("simple", chunk_content),
                     ))
                     stats.chunks_created += 1
                 except Exception:
                     stats.errors += 1
 
             stats.files_indexed += 1
+
+        if found_paths:
+            orphan_result = await session.execute(
+                delete(CodebaseChunk)
+                .where(
+                    and_(
+                        CodebaseChunk.repo_name == repo_name,
+                        CodebaseChunk.file_path.not_in(found_paths),
+                    )
+                )
+                .returning(CodebaseChunk.id)
+            )
+            stats.orphans_deleted = len(list(orphan_result))
 
         await session.commit()
 

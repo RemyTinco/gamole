@@ -75,6 +75,40 @@ async def lifespan(app: FastAPI):
         for sql in migrations:
             await conn.execute(sqlalchemy.text(sql))
     logger.info("Database tables verified/created")
+
+    # Auto re-index all repositories after schema migration
+    # This runs in the background so it doesn't block startup
+    async def _auto_reindex():
+        """Re-index all repositories to populate new columns (symbol_name, content_hash, etc.)."""
+        import asyncio
+        await asyncio.sleep(5)  # Wait for DB to be fully ready
+        try:
+            from sqlalchemy import select
+
+            from gamole_ai.codebase.indexer import index_repository
+            from gamole_db import get_session
+            from gamole_db.models import Repository
+
+            async for session in get_session():
+                result = await session.execute(select(Repository))
+                repos = list(result.scalars())
+
+            if not repos:
+                return
+
+            logger.info(f"[startup] Auto re-indexing {len(repos)} repositories...")
+
+            for repo in repos:
+                try:
+                    stats = await index_repository(repo.url, repo.branch)
+                    logger.info(f"[startup] Re-indexed {repo.name}: {stats.chunks_created} chunks, {stats.files_skipped} skipped, {stats.orphans_deleted} orphans deleted")
+                except Exception as e:
+                    logger.warning(f"[startup] Re-index failed for {repo.name}: {e}")
+        except Exception as e:
+            logger.warning(f"[startup] Auto re-index failed: {e}")
+
+    import asyncio
+    asyncio.create_task(_auto_reindex())
     yield
 
 

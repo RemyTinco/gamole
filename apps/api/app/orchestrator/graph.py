@@ -22,7 +22,9 @@ from gamole_ai.agents.qa import run as run_qa
 from gamole_ai.agents.structurer import run as run_structurer
 from gamole_ai.agents.supervisor import run as run_supervisor
 from gamole_ai.agents.types import MAX_CRITIQUE_ROUNDS, AgentInput
+from gamole_ai.context_formatter import format_context
 from gamole_ai.cost_tracker import track_usage
+from gamole_ai.reranker import rerank
 from gamole_ai.retrieval import retrieve_context
 
 
@@ -47,9 +49,13 @@ class WorkflowState(TypedDict):
 
 
 def _to_agent_input(state: WorkflowState, bump_round: bool = False) -> AgentInput:
+    # Use formatted markdown context if available, fall back to raw JSON
+    context_data = state["context"]
+    formatted = context_data.get("formattedContext") if isinstance(context_data, dict) else None
+    context_str = formatted if formatted else json.dumps(context_data)
     return AgentInput(
         document=state["document"],
-        context=json.dumps(state["context"]),
+        context=context_str,
         round=max(1, state["round"] + (1 if bump_round else 0)),
         previous_critiques=state["critiques"],
     )
@@ -62,6 +68,11 @@ def _estimate_tokens(text: str) -> int:
 
 async def retrieve_context_node(state: WorkflowState) -> dict:
     bundle = await retrieve_context(state["input"])
+    # Rerank code chunks using metadata boosts and keyword overlap
+    if bundle.code_chunks:
+        bundle.code_chunks = rerank(bundle.code_chunks, state["input"])
+    # Format context as structured markdown for agent injection
+    format_context(bundle)  # sets bundle.formatted_context
     return {
         "context": bundle.model_dump(by_alias=True),
         "status": "CONTEXT_RETRIEVED",
