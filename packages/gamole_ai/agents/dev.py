@@ -11,7 +11,16 @@ Are dependencies identified? Provide critique and implementation notes.
 
 The context includes repository descriptions and code chunks from the actual codebase.
 Use these to ground your technical review in reality: reference specific files, patterns,
-and repositories when pointing out complexities or suggesting implementation approaches."""
+and repositories when pointing out complexities or suggesting implementation approaches.
+
+IMPORTANT — Code references:
+You MUST embed concrete code references in your critique and in any revised_doc you produce.
+When the context shows a relevant file or symbol, cite it explicitly using the format:
+  `path/to/file.py > function_name` or `path/to/module/`
+For example: "The current auth middleware at `apps/api/app/auth/middleware.py > auth_dependency`
+will need updating to support the new role-based check."
+Reference real files and symbols from the provided context — never invent paths.
+If no code context is relevant to a particular point, omit the reference rather than guessing."""
 
 
 def _build_fallback(critique: str) -> AgentOutput:

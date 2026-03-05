@@ -13,7 +13,15 @@ criteria, technical notes, and out-of-scope items.
 The context may include:
 - Similar existing Linear issues (use these to match naming conventions and scope)
 - Relevant code chunks from the codebase (use these for accurate technical notes)
-- Repository descriptions (use these to understand the tech stack and reference specific repos in technical notes)"""
+- Repository descriptions (use these to understand the tech stack and reference specific repos in technical notes)
+
+IMPORTANT — Code references:
+When the provided code context contains relevant files, functions, or classes, you MUST embed
+concrete code references in the technical notes of your output. Use the format:
+  `path/to/file.py > function_name` or `path/to/file.ts > ClassName`
+For example: "Extend the existing validation in `packages/gamole_ai/agents/draft.py > run`".
+Only reference files and symbols that genuinely appear in the provided context — never fabricate paths.
+If no code context is provided or none is relevant, omit code references rather than guessing."""
 
 
 def _build_fallback(input: AgentInput, critique: str) -> AgentOutput:

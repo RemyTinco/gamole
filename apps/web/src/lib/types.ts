@@ -8,6 +8,7 @@ export interface Generation {
   costBreakdown?: CostBreakdown | null
   input?: string | null
   discoveryQuestions?: DiscoveryQuestion[] | null
+  qualityScore?: number | null
 }
 
 export interface GeneratedOutput {

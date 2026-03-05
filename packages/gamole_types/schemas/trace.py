@@ -47,6 +47,7 @@ class TraceEventSummary(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
 
+    id: str
     agent_name: str
     event_type: str
     round_number: int
@@ -54,4 +55,4 @@ class TraceEventSummary(BaseModel):
     token_in: int | None = None
     token_out: int | None = None
     success: bool = True
-    timestamp: str
+    created_at: str

@@ -75,7 +75,10 @@ async def test_trace_callback_emit_callback():
     assert len(emitted) >= 1
     assert "promptText" not in emitted[0]
     assert "responseText" not in emitted[0]
-    assert "agent_name" in emitted[0] or "event_type" in emitted[0]
+    assert "agentName" in emitted[0]
+    assert "eventType" in emitted[0]
+    assert "id" in emitted[0]
+    assert "createdAt" in emitted[0]
 
 
 def test_traces_endpoint_requires_auth(client):

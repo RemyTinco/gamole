@@ -4,6 +4,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
+from datetime import datetime, timezone
 from importlib import import_module
 from typing import Protocol, TypedDict, cast, override
 
@@ -233,12 +234,15 @@ class TraceCallbackHandler(AsyncCallbackHandler):
         if self._emit_callback:
             self._emit_callback(
                 {
-                    "agent_name": model_name,
-                    "event_type": "agent_complete",
-                    "latency_ms": latency_ms,
-                    "token_in": token_in,
-                    "token_out": token_out,
-                    "round_number": self._current_round,
+                    "id": trace["id"],
+                    "agentName": model_name,
+                    "eventType": "agent_complete",
+                    "latencyMs": latency_ms,
+                    "tokenIn": token_in,
+                    "tokenOut": token_out,
+                    "roundNumber": self._current_round,
+                    "success": True,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
                 }
             )
 
@@ -313,9 +317,12 @@ class TraceCallbackHandler(AsyncCallbackHandler):
         if self._emit_callback:
             self._emit_callback(
                 {
-                    "agent_name": agent_name,
-                    "event_type": event_type,
-                    "round_number": round_number,
+                    "id": trace["id"],
+                    "agentName": agent_name,
+                    "eventType": event_type,
+                    "roundNumber": round_number,
+                    "success": True,
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
                     "metadata": metadata,
                 }
             )

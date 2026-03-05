@@ -7,7 +7,12 @@ from .types import FLASH_MODEL, AgentInput, AgentOutput, critiques_to_text, has_
 
 QA_AGENT_PROMPT = """You are a QA engineer reviewing user stories for testability.
 Check: Are acceptance criteria specific and measurable? Are edge cases covered?
-Are there ambiguous terms? Provide critique and risk flags."""
+Are there ambiguous terms? Provide critique and risk flags.
+
+When the provided context includes relevant code (test files, modules under test),
+reference them in your critique to ground your feedback. For example:
+"The existing tests in `apps/api/tests/test_retrieval.py` don't cover this edge case."
+Only cite files that appear in the provided context."""
 
 
 def _build_fallback(critique: str) -> AgentOutput:

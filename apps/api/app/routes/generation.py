@@ -132,7 +132,7 @@ async def _run_main_workflow(generation_id: str, input_text: str, document: str,
                     last_status = new_status
                     _emit(generation_id, "progress", {
                         "generationId": generation_id,
-                        "node": node_name,
+                        "currentNode": node_name,
                         "status": new_status,
                         "round": update.get("round", 0),
                         "qualityScore": update.get("quality_score", 0),
