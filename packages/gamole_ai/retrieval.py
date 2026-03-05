@@ -60,8 +60,8 @@ async def retrieve_context(
                         description,
                         team_id,
                         1.0 - (embedding <=> (:query_vec)::vector) AS similarity
-                    FROM linear_issue_cache
-                    WHERE (:team_id IS NULL OR team_id = :team_id)
+                    FROM linear_issues_cache
+                    WHERE (:team_id::text IS NULL OR team_id = :team_id)
                     ORDER BY embedding <=> (:query_vec)::vector
                     LIMIT :top_k
                     """
@@ -85,6 +85,7 @@ async def retrieve_context(
                         )
                     )
             except Exception:
+                await session.rollback()
                 logger.warning("retrieveContext: linear issues query failed", exc_info=True)
 
             repo_summaries: list[RepositorySummary] = []
@@ -99,6 +100,7 @@ async def retrieve_context(
                         )
                     )
             except Exception:
+                await session.rollback()
                 logger.warning("retrieveContext: repository query failed", exc_info=True)
 
             code_chunks: list[CodeChunk] = []
@@ -117,7 +119,7 @@ async def retrieve_context(
                         parent_symbol,
                         1.0 - (embedding <=> (:query_vec)::vector) AS similarity
                     FROM codebase_chunks
-                    WHERE (:repo_names IS NULL OR repo_name = ANY(:repo_names))
+                    WHERE (:repo_names::text[] IS NULL OR repo_name = ANY(:repo_names::text[]))
                     ORDER BY embedding <=> (:query_vec)::vector
                     LIMIT :top_k_2x
                     """
@@ -152,7 +154,7 @@ async def retrieve_context(
                             ts_rank(content_tsv, plainto_tsquery('simple', :query)) AS ts_score
                         FROM codebase_chunks
                         WHERE content_tsv @@ plainto_tsquery('simple', :query)
-                          AND (:repo_names IS NULL OR repo_name = ANY(:repo_names))
+                          AND (:repo_names::text[] IS NULL OR repo_name = ANY(:repo_names::text[]))
                         ORDER BY ts_rank(content_tsv, plainto_tsquery('simple', :query)) DESC
                         LIMIT :top_k_2x
                         """
@@ -199,6 +201,7 @@ async def retrieve_context(
                         )
                     )
             except Exception:
+                await session.rollback()
                 logger.warning("retrieveContext: codebase chunks query failed", exc_info=True)
 
             return ContextBundle(

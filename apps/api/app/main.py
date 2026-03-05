@@ -88,6 +88,7 @@ async def lifespan(app: FastAPI):
             from gamole_ai.codebase.indexer import index_repository
             from gamole_db import get_session
             from gamole_db.models import Repository
+            from app.config import settings
 
             async for session in get_session():
                 result = await session.execute(select(Repository))
@@ -100,7 +101,7 @@ async def lifespan(app: FastAPI):
 
             for repo in repos:
                 try:
-                    stats = await index_repository(repo.url, repo.branch)
+                    stats = await index_repository(repo.url, repo.branch, settings.github_token or None)
                     logger.info(f"[startup] Re-indexed {repo.name}: {stats.chunks_created} chunks, {stats.files_skipped} skipped, {stats.orphans_deleted} orphans deleted")
                 except Exception as e:
                     logger.warning(f"[startup] Re-index failed for {repo.name}: {e}")
