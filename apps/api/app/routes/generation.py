@@ -570,7 +570,18 @@ async def submit_discovery_answers(generation_id: str, body: DiscoveryAnswersInp
     enrichment_result = await enrich_document(enrich_input)
     enriched_document = enrichment_result.enriched_document
 
-    # Persist enriched document + answers to DB
+    # Re-retrieve RAG context using enriched document for better relevance
+    from gamole_ai.context_formatter import format_context
+    from gamole_ai.reranker import rerank
+    from gamole_ai.retrieval import retrieve_context
+
+    fresh_bundle = await retrieve_context(enriched_document)
+    if fresh_bundle.code_chunks:
+        fresh_bundle.code_chunks = rerank(fresh_bundle.code_chunks, enriched_document)
+    format_context(fresh_bundle)
+    fresh_context = fresh_bundle.model_dump(by_alias=True)
+
+    # Persist enriched document + answers + fresh context to DB
     async for session in get_session():
         wf = await session.get(Workflow, uuid.UUID(generation_id))
         if wf:
@@ -583,9 +594,9 @@ async def submit_discovery_answers(generation_id: str, body: DiscoveryAnswersInp
             wf.state_json = existing_state
             await session.commit()
 
-    # Re-acquire lock and spawn main workflow
+    # Re-acquire lock and spawn main workflow with fresh context
     _active_generation = {"id": generation_id}
-    asyncio.create_task(_run_main_workflow(generation_id, input_text, enriched_document, context))
+    asyncio.create_task(_run_main_workflow(generation_id, input_text, enriched_document, fresh_context))
 
     return {"status": "running"}
 
