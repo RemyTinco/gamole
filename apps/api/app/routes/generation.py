@@ -7,6 +7,7 @@ import asyncio
 import json
 import uuid
 from datetime import datetime, timezone
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -56,7 +57,7 @@ def _emit(generation_id: str, event_type: str, data: dict) -> None:
         queue.put_nowait(event)
 
 
-async def _get_or_create_workspace(session) -> tuple:
+async def _get_or_create_workspace(session) -> Any:
     """Get or create a default user and workspace for standalone API use."""
     from gamole_db import User, Workspace
 
@@ -78,10 +79,15 @@ async def _run_main_workflow(generation_id: str, input_text: str, document: str,
     """Background task: run the main LangGraph workflow after discovery answers submitted."""
     global _active_generation
     from gamole_ai.cost_tracker import CostTracker, set_tracker
+    from gamole_ai.trace_handler import TraceCallbackHandler
     from gamole_db import Workflow, get_session
 
     tracker = CostTracker()
     ctx_token = set_tracker(tracker)
+    trace_handler = TraceCallbackHandler(
+        workflow_id=generation_id,
+        emit_callback=lambda data: _emit(generation_id, "trace", data),
+    )
 
     try:
         from app.orchestrator.graph import WorkflowState, workflow
@@ -109,13 +115,17 @@ async def _run_main_workflow(generation_id: str, input_text: str, document: str,
             "qa_doc": None,
             "dev_doc": None,
             "po_doc": None,
+            "_trace_handler": trace_handler,
         }
 
         last_status = "CONTEXT_RETRIEVED"
         final_document = document
         final_quality_score = 0.0
 
-        async for chunk in workflow.astream(initial_state):
+        async for chunk in workflow.astream(
+            initial_state,
+            config={"callbacks": [trace_handler]},
+        ):
             for node_name, update in chunk.items():
                 new_status = update.get("status", last_status)
                 if new_status != last_status:
@@ -131,6 +141,9 @@ async def _run_main_workflow(generation_id: str, input_text: str, document: str,
                     final_document = update["document"]
                 if update.get("quality_score"):
                     final_quality_score = update["quality_score"]
+
+        async for session in get_session():
+            await trace_handler.persist(cast(Any, session))
 
         # Update DB: workflow paused at USER_EDITING
         async for session in get_session():
@@ -177,11 +190,16 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
     sys.path.insert(0, "/tmp/gamole/apps/api")
 
     from gamole_ai.cost_tracker import CostTracker, set_tracker
+    from gamole_ai.trace_handler import TraceCallbackHandler
     from gamole_db import Workflow, get_session
 
     # Set up cost tracker
     tracker = CostTracker()
     ctx_token = set_tracker(tracker)
+    trace_handler = TraceCallbackHandler(
+        workflow_id=generation_id,
+        emit_callback=lambda data: _emit(generation_id, "trace", data),
+    )
 
     try:
         from app.orchestrator.graph import WorkflowState, discovery_workflow
@@ -209,17 +227,24 @@ async def _run_generation(generation_id: str, input_text: str) -> None:
             "qa_doc": None,
             "dev_doc": None,
             "po_doc": None,
+            "_trace_handler": trace_handler,
         }
 
         final_questions: list = []
         final_context: dict = {}
 
-        async for chunk in discovery_workflow.astream(initial_state):
+        async for chunk in discovery_workflow.astream(
+            initial_state,
+            config={"callbacks": [trace_handler]},
+        ):
             for _node_name, update in chunk.items():
                 if update.get("discovery_questions"):
                     final_questions = update["discovery_questions"]
                 if update.get("context"):
                     final_context = update["context"]
+
+        async for session in get_session():
+            await trace_handler.persist(cast(Any, session))
 
         # Persist to DB with AWAITING_DISCOVERY status
         async for session in get_session():
@@ -369,6 +394,32 @@ async def get_generation_output(generation_id: str):
         raise HTTPException(status_code=404, detail="Generation not found")
 
 
+@router.get("/generation/{generation_id}/traces", dependencies=[Depends(auth_dependency)])
+async def get_generation_traces(generation_id: str):
+    """Get all trace events for a generation (full prompt/response text)."""
+    from gamole_db import AgentRun, get_session
+    from gamole_types.schemas.trace import TraceEvent
+
+    try:
+        async for session in get_session():
+            result = await session.execute(
+                select(AgentRun)
+                .where(AgentRun.workflow_id == uuid.UUID(generation_id))
+                .order_by(AgentRun.created_at.asc())
+            )
+            traces = result.scalars().all()
+            return {
+                "traces": [
+                    TraceEvent.model_validate(t, from_attributes=True).model_dump(mode="json")
+                    for t in traces
+                ]
+            }
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid generation ID")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 class DocumentUpdateInput(BaseModel):
     document: str
 
@@ -429,8 +480,11 @@ async def update_structured_output(generation_id: str, body: StructuredOutputUpd
 async def finalize_generation(generation_id: str):
     """Trigger the structuring step after user editing."""
     from gamole_ai.cost_tracker import CostTracker, clear_tracker, set_tracker
+    from gamole_ai.trace_handler import TraceCallbackHandler
     from gamole_db import Workflow, get_session
 
+    document = ""
+    existing_cost: dict = {}
     async for session in get_session():
         wf = await session.get(Workflow, uuid.UUID(generation_id))
         if not wf:
@@ -444,6 +498,10 @@ async def finalize_generation(generation_id: str):
     # Run structure step
     tracker = CostTracker()
     ctx_token = set_tracker(tracker)
+    trace_handler = TraceCallbackHandler(
+        workflow_id=generation_id,
+        emit_callback=lambda data: _emit(generation_id, "trace", data),
+    )
     try:
         from app.orchestrator.graph import WorkflowState, finalize_workflow
 
@@ -464,9 +522,16 @@ async def finalize_generation(generation_id: str):
             "qa_doc": None,
             "dev_doc": None,
             "po_doc": None,
+            "_trace_handler": trace_handler,
         }
 
-        final_state = await finalize_workflow.ainvoke(state)
+        final_state = await finalize_workflow.ainvoke(
+            state,
+            config={"callbacks": [trace_handler]},
+        )
+
+        async for session in get_session():
+            await trace_handler.persist(cast(Any, session))
 
         # Merge cost data
         finalize_cost = tracker.to_dict()

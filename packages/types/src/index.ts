@@ -54,5 +54,13 @@ export {
   type GeneratedOutput,
 } from './schemas/generated';
 
+// Trace schemas and types
+export {
+  traceEventSchema,
+  type TraceEvent,
+  traceEventSummarySchema,
+  type TraceEventSummary,
+} from './schemas/trace';
+
 // Template loader
 export { loadTemplate, listTemplates } from './templates/loader';

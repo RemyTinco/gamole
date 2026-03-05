@@ -7,6 +7,7 @@ import type {
   Team,
   ChatResponse,
   SyncStatus,
+  TraceEvent,
 } from "./types"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -56,6 +57,10 @@ export async function getGeneration(id: string) {
 
 export async function getGenerationOutput(id: string) {
   return api.get(`api/generation/${id}/output`).json<GeneratedOutput>()
+}
+
+export async function getGenerationTraces(id: string) {
+  return api.get(`api/generation/${id}/traces`).json<{ traces: TraceEvent[] }>()
 }
 
 export async function updateDocument(id: string, document: string) {

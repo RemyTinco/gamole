@@ -51,9 +51,44 @@ export interface DiscoveryAnswer {
 }
 
 export interface GenerationEvent {
-  type: "status" | "progress" | "user_edit_required" | "complete" | "error" | "heartbeat" | "discovery_questions"
+  type: "status" | "progress" | "user_edit_required" | "complete" | "error" | "heartbeat" | "discovery_questions" | "trace"
   data: Record<string, unknown>
   timestamp: string
+}
+
+export interface TraceEvent {
+  id: string
+  workflowId: string
+  agentName: string
+  eventType: string
+  roundNumber: number
+  promptText?: string | null
+  responseText?: string | null
+  modelName?: string | null
+  latencyMs?: number | null
+  tokenIn?: number | null
+  tokenOut?: number | null
+  costUsd?: number | null
+  success: boolean
+  errorType?: string | null
+  critiqueMarkdown?: string | null
+  metadataJson?: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface TraceEventSummary {
+  id: string
+  workflowId: string
+  agentName: string
+  eventType: string
+  roundNumber: number
+  modelName?: string | null
+  latencyMs?: number | null
+  tokenIn?: number | null
+  tokenOut?: number | null
+  costUsd?: number | null
+  success: boolean
+  createdAt: string
 }
 
 export interface Repository {

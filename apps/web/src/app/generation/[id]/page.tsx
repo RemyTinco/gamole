@@ -10,9 +10,10 @@ import { Badge } from "@/components/ui/badge"
 import { Editor } from "@/components/editor"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Check, Circle, Loader2, Send, Save, ChevronDown, ChevronRight, AlertCircle, DollarSign } from "lucide-react"
+import { Check, Circle, Loader2, Send, Save, ChevronDown, ChevronRight, AlertCircle, DollarSign, Bug } from "lucide-react"
 import { toast } from "sonner"
 import type { Generation, GeneratedEpic } from "@/lib/types"
+import { TracePanel } from "@/components/trace-panel"
 
 const PIPELINE_STEPS = ["Retrieve Context", "Discovery", "Refinement", "Editing", "Structure"]
 
@@ -42,6 +43,7 @@ export default function GenerationDetailPage({
   const [expandedEpics, setExpandedEpics] = useState<Set<number>>(new Set())
   const [discoveryAnswers, setDiscoveryAnswers] = useState<Record<string, string>>({})
   const [submittingDiscovery, setSubmittingDiscovery] = useState(false)
+  const [debugOpen, setDebugOpen] = useState(false)
 
   const status = stream.status !== "connecting" ? stream.status : gen?.status || "Loading"
   const canEditDocument = status === "USER_EDITING" || status === "READY_TO_PUSH"
@@ -120,9 +122,15 @@ export default function GenerationDetailPage({
           <h1 className="text-2xl font-bold">Generation</h1>
           <p className="text-sm text-muted-foreground">{id}</p>
         </div>
-        <Badge variant={isComplete ? "default" : isError ? "destructive" : "secondary"} className="text-sm">
-          {status}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setDebugOpen(!debugOpen)}>
+            <Bug className="h-4 w-4 mr-2" />
+            Debug
+          </Button>
+          <Badge variant={isComplete ? "default" : isError ? "destructive" : "secondary"} className="text-sm">
+            {status}
+          </Badge>
+        </div>
       </div>
 
       {/* Pipeline tracker */}
@@ -334,6 +342,7 @@ export default function GenerationDetailPage({
         </Card>
       )}
 
+      <TracePanel generationId={id} isOpen={debugOpen} onClose={() => setDebugOpen(false)} liveTraceEvents={stream.traceEvents} />
     </div>
   )
 }

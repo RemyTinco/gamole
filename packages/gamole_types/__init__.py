@@ -10,6 +10,7 @@ from .schemas.generated import GeneratedEpic, GeneratedOutput, GeneratedStory
 from .schemas.linear import LinearPushConfig, LinearPushResult
 from .schemas.quality import QualityFlag, QualityScore
 from .schemas.template import Template
+from .schemas.trace import TraceEvent, TraceEventSummary
 from .schemas.workflow import (
     DocumentVersion,
     DocumentVersionType,
@@ -32,6 +33,8 @@ __all__ = [
     "QualityFlag",
     "QualityScore",
     "Template",
+    "TraceEvent",
+    "TraceEventSummary",
     "WorkflowInput",
     "WorkflowStatus",
 ]

@@ -13,6 +13,7 @@ from .generated import GeneratedEpic, GeneratedOutput, GeneratedStory
 from .linear import LinearPushConfig, LinearPushResult
 from .quality import QualityFlag, QualityScore
 from .template import Template
+from .trace import TraceEvent, TraceEventSummary
 from .workflow import (
     DocumentVersion,
     DocumentVersionType,
@@ -41,6 +42,8 @@ __all__ = [
     "QualityFlag",
     "QualityScore",
     "Template",
+    "TraceEvent",
+    "TraceEventSummary",
     "WorkflowInput",
     "WorkflowStatus",
 ]

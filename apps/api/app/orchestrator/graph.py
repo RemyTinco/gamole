@@ -46,6 +46,7 @@ class WorkflowState(TypedDict):
     qa_doc: str | None
     dev_doc: str | None
     po_doc: str | None
+    _trace_handler: Any | None
 
 
 def _to_agent_input(state: WorkflowState, bump_round: bool = False) -> AgentInput:
@@ -67,12 +68,21 @@ def _estimate_tokens(text: str) -> int:
 
 
 async def retrieve_context_node(state: WorkflowState) -> dict:
+    handler = state.get("_trace_handler")
+    if handler:
+        handler.add_custom_event("retrieval_start", "retrieve_context", state.get("round", 0), None)
     bundle = await retrieve_context(state["input"])
     # Rerank code chunks using metadata boosts and keyword overlap
     if bundle.code_chunks:
         bundle.code_chunks = rerank(bundle.code_chunks, state["input"])
     # Format context as structured markdown for agent injection
     format_context(bundle)  # sets bundle.formatted_context
+    if handler:
+        handler.add_custom_event("retrieval_complete", "retrieve_context", state.get("round", 0), {
+            "linear_issues_count": len(bundle.linear_artifacts) if bundle.linear_artifacts else 0,
+            "code_chunks_count": len(bundle.code_chunks) if bundle.code_chunks else 0,
+            "repositories_count": len(bundle.repositories) if bundle.repositories else 0,
+        })
     return {
         "context": bundle.model_dump(by_alias=True),
         "status": "CONTEXT_RETRIEVED",
@@ -91,6 +101,11 @@ async def discovery_node(state: WorkflowState) -> dict:
 
 
 async def draft_node(state: WorkflowState) -> dict:
+    handler = state.get("_trace_handler")
+    if handler:
+        new_round = state["round"] + 1
+        handler.set_round(new_round)
+        handler.add_custom_event("round_start", "draft", new_round, {"round": new_round})
     agent_input = _to_agent_input(state, bump_round=True)
     result = await run_draft(agent_input)
     input_tokens = _estimate_tokens(agent_input.document + agent_input.context)
@@ -148,6 +163,11 @@ async def merge_reviews_node(state: WorkflowState) -> dict:
     for c in [state.get("qa_critique"), state.get("dev_critique"), state.get("po_critique")]:
         if c:
             new_critiques.append(c)
+    handler = state.get("_trace_handler")
+    if handler:
+        handler.add_custom_event("merge_complete", "merge_reviews", state.get("round", 0), {
+            "doc_length": len(merged_doc),
+        })
     return {
         "document": merged_doc,
         "critiques": state["critiques"] + new_critiques,
@@ -161,6 +181,14 @@ async def supervise_node(state: WorkflowState) -> dict:
     input_tokens = _estimate_tokens(agent_input.document + agent_input.context)
     output_tokens = _estimate_tokens(result.reason)
     track_usage("supervisor", input_tokens, output_tokens)
+    handler = state.get("_trace_handler")
+    if handler:
+        handler.add_custom_event("supervisor_decision", "supervisor", state.get("round", 0), {
+            "ready": result.ready,
+            "force_stop": result.force_stop,
+            "quality_score": result.quality_score,
+            "reason": result.reason,
+        })
     return {
         "quality_score": result.quality_score or state["quality_score"],
         "status": "QUALITY_EVALUATED" if result.ready or result.force_stop else "SUPERVISOR_REFINED",
@@ -184,6 +212,13 @@ async def structure_node(state: WorkflowState) -> dict:
     output_text = json.dumps(output.model_dump(by_alias=True))
     output_tokens = _estimate_tokens(output_text)
     track_usage("structurer", input_tokens, output_tokens)
+    handler = state.get("_trace_handler")
+    if handler:
+        epics = output.model_dump(by_alias=True).get("epics", [])
+        handler.add_custom_event("structuring_complete", "structurer", 0, {
+            "epic_count": len(epics),
+            "story_count": sum(len(epic.get("stories", [])) for epic in epics),
+        })
     return {
         "structured_output": output.model_dump(by_alias=True),
         "status": "STRUCTURED",
@@ -277,6 +312,7 @@ async def run_workflow(input_text: str) -> dict:
         "qa_doc": None,
         "dev_doc": None,
         "po_doc": None,
+        "_trace_handler": None,
     }
 
     final_state = await workflow.ainvoke(initial_state)

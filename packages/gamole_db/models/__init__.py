@@ -142,6 +142,12 @@ class AgentRun(Base):
     success: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     error_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     critique_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False, server_default="agent_call")
+    prompt_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    model_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)
 
     workflow: Mapped["Workflow"] = relationship(back_populates="agent_runs")

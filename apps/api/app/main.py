@@ -71,6 +71,13 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE codebase_chunks ADD COLUMN IF NOT EXISTS content_tsv tsvector",
             "UPDATE codebase_chunks SET content_tsv = to_tsvector('simple', chunk_text) WHERE content_tsv IS NULL",
             "CREATE INDEX IF NOT EXISTS codebase_chunks_tsv_idx ON codebase_chunks USING GIN(content_tsv)",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS event_type TEXT DEFAULT 'agent_call'",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS prompt_text TEXT",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS response_text TEXT",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS model_name TEXT",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS metadata_json JSONB",
+            "ALTER TABLE agent_runs ADD COLUMN IF NOT EXISTS cost_usd REAL",
+            "CREATE INDEX IF NOT EXISTS idx_agent_runs_workflow_id ON agent_runs(workflow_id)",
         ]
         for sql in migrations:
             await conn.execute(sqlalchemy.text(sql))
@@ -85,10 +92,10 @@ async def lifespan(app: FastAPI):
         try:
             from sqlalchemy import select
 
+            from app.config import settings
             from gamole_ai.codebase.indexer import index_repository
             from gamole_db import get_session
             from gamole_db.models import Repository
-            from app.config import settings
 
             async for session in get_session():
                 result = await session.execute(select(Repository))
