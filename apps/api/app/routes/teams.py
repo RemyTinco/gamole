@@ -1,7 +1,7 @@
 """Linear team management: track teams with descriptions so AI can auto-route tickets."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -101,7 +101,7 @@ async def update_team(team_id: str, body: UpdateTeamBody):
             team.default_state_id = body.default_state_id
         if body.default_labels is not None:
             team.default_labels = body.default_labels
-        team.updated_at = datetime.now(timezone.utc)
+        team.updated_at = datetime.utcnow()
 
         await session.commit()
         await session.refresh(team)
@@ -162,7 +162,7 @@ async def sync_teams_from_linear(body: SyncTeamsBody = Body(default=None)):
             if existing:
                 if desc_override:
                     existing.description = desc_override
-                    existing.updated_at = datetime.now(timezone.utc)
+                    existing.updated_at = datetime.utcnow()
                     updated += 1
             else:
                 desc = desc_override or f"Team '{node['name']}' (add a description to help agents route tickets)"

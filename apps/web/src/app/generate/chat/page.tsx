@@ -127,13 +127,13 @@ Is there anything else you'd like to specify? Or click "Generate Requirements" b
           value={inputValue}
           onChange={e => setInputValue(e.target.value)}
           placeholder="Type your requirement..."
-          className="flex-1 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          className="flex-1 rounded-md border border-input bg-background text-foreground px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           disabled={isSubmitting}
         />
         <button
           type="submit"
           disabled={!inputValue.trim() || isSubmitting}
-          className="rounded-md bg-secondary px-4 py-2 text-sm font-medium hover:bg-secondary/80 disabled:opacity-50"
+          className="rounded-md bg-secondary text-secondary-foreground px-4 py-2 text-sm font-medium hover:bg-secondary/80 disabled:opacity-50"
         >
           Send
         </button>
@@ -151,7 +151,7 @@ Is there anything else you'd like to specify? Or click "Generate Requirements" b
               localStorage.setItem('linear_team_id', e.target.value)
             }}
             placeholder="team-id"
-            className="flex-1 rounded-md border px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="flex-1 rounded-md border border-input bg-background text-foreground px-3 py-1 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
 

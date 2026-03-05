@@ -83,9 +83,6 @@ export function streamGeneration(id: string): EventSource {
 }
 
 // Linear
-export async function validateLinear() {
-  return api.get("api/linear/validate").json<{ valid: boolean }>()
-}
 
 export async function pushToLinear(issues: Record<string, unknown>[]) {
   return api.post("api/linear/push", { json: { issues } }).json()
@@ -149,7 +146,7 @@ export async function listGithubRepos() {
 }
 
 export async function getContextSummary() {
-  return api.get("api/repositories/context-summary").json()
+  return api.get("api/repositories/context/summary").json()
 }
 
 // Teams
@@ -174,35 +171,27 @@ export async function syncTeams() {
 }
 
 export async function getTeamsContextSummary() {
-  return api.get("api/teams/context-summary").json()
+  return api.get("api/teams/context/summary").json()
 }
 
 // Sync
 export async function linearSync(full?: boolean) {
-  return api.post("api/sync/linear", { json: { full: full ?? false } }).json()
+  return api.post("api/sync/linear", { json: { forceFull: full ?? false } }).json()
 }
 
 export async function getLinearSyncStatus() {
   return api.get("api/sync/linear/status").json<SyncStatus>()
 }
 
-export async function setLinearSchedule(intervalMinutes: number, enabled: boolean) {
-  return api.post("api/sync/linear/schedule", { json: { intervalMinutes, enabled } }).json()
+export async function setLinearSchedule(intervalHours: number, enabled: boolean) {
+  return api.post("api/sync/linear/schedule", { json: { intervalHours, enabled } }).json()
 }
 
 export async function getLinearSchedule() {
-  return api.get("api/sync/linear/schedule").json<{ intervalMinutes: number; enabled: boolean }>()
-}
-
-export async function codebaseSync() {
-  return api.post("api/sync/codebase").json()
+  return api.get("api/sync/linear/schedule").json<{ intervalHours: number; enabled: boolean }>()
 }
 
 
-// Admin
-export async function getAdminMetrics() {
-  return api.get("api/admin/metrics").json()
-}
 
 // Generic helpers
 export async function apiFetch<T = unknown>(path: string): Promise<T> {

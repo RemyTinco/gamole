@@ -137,7 +137,7 @@ function RepositoriesTab() {
                       <Badge variant="destructive" className="text-xs">Error</Badge>
                     )}
                     {repo.indexingStatus === "done" && !repo.indexingError && (
-                      <Badge variant="outline" className="text-xs text-green-600 border-green-600">Indexed</Badge>
+                      <Badge variant="outline" className="text-xs text-green-700 border-green-700 dark:text-green-500 dark:border-green-500">Indexed</Badge>
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate">{repo.description || repo.url}</p>
@@ -295,8 +295,8 @@ function SyncTab() {
   }
 
   const handleSchedule = async (enabled: boolean) => {
-    const mins = parseInt(interval) || schedule?.intervalMinutes || 30
-    try { await setLinearSchedule(mins, enabled); toast.success(enabled ? "Periodic sync enabled" : "Periodic sync disabled"); mutateSchedule() }
+    const hours = parseInt(interval) || schedule?.intervalHours || 6
+    try { await setLinearSchedule(hours, enabled); toast.success(enabled ? "Periodic sync enabled" : "Periodic sync disabled"); mutateSchedule() }
     catch { toast.error("Failed to update schedule") }
   }
 
@@ -327,20 +327,20 @@ function SyncTab() {
         <CardHeader><CardTitle>Periodic Sync</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-3">
-            <label className="text-sm">Interval (minutes):</label>
+            <label className="text-sm">Interval (hours):</label>
             <Input
               type="number"
               className="w-24"
-              value={interval || schedule?.intervalMinutes || ""}
+              value={interval || schedule?.intervalHours || ""}
               onChange={(e) => setInterval2(e.target.value)}
-              placeholder="30"
+              placeholder="6"
             />
           </div>
           <div className="flex gap-2">
             <Button onClick={() => handleSchedule(true)} size="sm">Enable</Button>
             <Button onClick={() => handleSchedule(false)} variant="outline" size="sm">Disable</Button>
           </div>
-          {schedule && <p className="text-xs text-muted-foreground">Currently: {schedule.enabled ? `Enabled, every ${schedule.intervalMinutes}min` : "Disabled"}</p>}
+          {schedule && <p className="text-xs text-muted-foreground">Currently: {schedule.enabled ? `Enabled, every ${schedule.intervalHours}h` : "Disabled"}</p>}
         </CardContent>
       </Card>
     </div>

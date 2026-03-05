@@ -13,33 +13,29 @@ AI-powered ticket refinement engine. Takes rough feature requests, runs them thr
 
 ## Architecture
 
-```
-┌─────────────┐     ┌──────────────────────────────────────────────┐
-│  Next.js UI  │────▶│  FastAPI Backend                              │
-│  (port 3000) │     │                                              │
-└─────────────┘     │  ┌──────────┐  ┌────────────┐  ┌──────────┐ │
-                    │  │ LangGraph │  │ LangChain  │  │ pgvector │ │
-                    │  │ Workflow  │  │ + LiteLLM  │  │ RAG      │ │
-                    │  └──────────┘  └────────────┘  └──────────┘ │
-                    │                                              │
-                    │  ┌──────────┐  ┌────────────┐               │
-                    │  │ Linear   │  │ GitHub     │               │
-                    │  │ GraphQL  │  │ Codebase   │               │
-                    │  └──────────┘  └────────────┘               │
-                    └──────────────────────────────────────────────┘
+```mermaid
+graph LR
+    UI["Next.js UI<br/>(port 3000)"] --> Backend
+
+    subgraph Backend ["FastAPI Backend"]
+        LG["LangGraph<br/>Workflow"]
+        LC["LangChain<br/>+ LiteLLM"]
+        PG["pgvector<br/>RAG"]
+        Linear["Linear<br/>GraphQL"]
+        GH["GitHub<br/>Codebase"]
+    end
 ```
 
 ### Workflow (LangGraph)
 
-```
-Input -> Retrieve Context -> Draft -> [QA, Dev, PO] parallel -> Merge -> Supervisor
-                              ▲                                            │
-                              └────── loop if quality < threshold ─────────┘
-                                                                           │
-                                                              ▼ (approved)
-                                                        USER_EDITING (pause)
-                                                              │
-                                                        Finalize -> Structure -> Push to Linear
+```mermaid
+graph LR
+    Input --> Retrieve[Retrieve Context] --> Draft
+    Draft --> QA & Dev & PO
+    QA & Dev & PO --> Merge --> Supervisor
+    Supervisor -->|quality < threshold| Draft
+    Supervisor -->|approved| UE[USER_EDITING<br/>pause]
+    UE --> Finalize --> Structure --> Push[Push to Linear]
 ```
 
 - Max 5 iteration rounds
@@ -225,21 +221,23 @@ Ask questions like "How many tickets did Nelly create last 3 weeks?" or "What's 
 
 ## Project Structure
 
-```
-apps/
-  api/                 # FastAPI backend
-    app/
-      routes/          # API endpoints
-      orchestrator/    # LangGraph workflow
-      auth/            # JWT auth
-      config.py        # pydantic-settings
-  web/                 # Next.js frontend
+```mermaid
+graph TD
+    subgraph apps ["apps/"]
+        api["api/ — FastAPI backend"]
+        api --> routes["routes/ — API endpoints"]
+        api --> orch["orchestrator/ — LangGraph workflow"]
+        api --> auth["auth/ — JWT auth"]
+        api --> cfg["config.py — pydantic-settings"]
+        web["web/ — Next.js frontend"]
+    end
 
-packages/
-  gamole_ai/          # LangChain agents, embeddings, retrieval, codebase indexer
-  gamole_db/          # SQLAlchemy models, session management
-  gamole_linear/      # Linear GraphQL client, batch push, sync
-  gamole_types/       # Pydantic schemas (shared types)
+    subgraph packages ["packages/"]
+        gai["gamole_ai/ — LangChain agents, embeddings, retrieval, codebase indexer"]
+        gdb["gamole_db/ — SQLAlchemy models, session management"]
+        glin["gamole_linear/ — Linear GraphQL client, batch push, sync"]
+        gtyp["gamole_types/ — Pydantic schemas (shared types)"]
+    end
 ```
 
 ## Later Improvements

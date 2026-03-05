@@ -327,14 +327,14 @@ export default function ReviewAndPushPage() {
     return (
       <div className="space-y-4 max-w-4xl">
         <div className="flex items-center gap-3">
-          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${hasErrors && !hasIssues ? 'bg-red-100' : 'bg-green-100'}`}>
+          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${hasErrors && !hasIssues ? 'bg-red-100 dark:bg-red-950' : 'bg-green-100 dark:bg-green-950'}`}>
             {hasErrors && !hasIssues ? (
-              <X className="h-5 w-5 text-red-700" />
+              <X className="h-5 w-5 text-red-700 dark:text-red-400" />
             ) : (
-              <Check className="h-5 w-5 text-green-700" />
+              <Check className="h-5 w-5 text-green-700 dark:text-green-400" />
             )}
           </div>
-          <h1 className={`text-2xl font-bold ${hasErrors && !hasIssues ? 'text-red-700' : 'text-green-700'}`}>
+          <h1 className={`text-2xl font-bold ${hasErrors && !hasIssues ? 'text-red-700 dark:text-red-400' : 'text-green-700 dark:text-green-400'}`}>
             {hasErrors && !hasIssues ? 'Push Failed' : 'Pushed to Linear!'}
           </h1>
         </div>
@@ -378,12 +378,12 @@ export default function ReviewAndPushPage() {
         </div>
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && (
-            <Badge variant="secondary" className="text-amber-600 border-amber-300">
+            <Badge variant="secondary" className="text-amber-700 border-amber-300 dark:text-amber-400 dark:border-amber-600">
               Unsaved changes
             </Badge>
           )}
           {lastSaved && !hasUnsavedChanges && (
-            <Badge variant="secondary" className="text-green-600 border-green-300">
+            <Badge variant="secondary" className="text-green-700 border-green-300 dark:text-green-500 dark:border-green-600">
               <Check className="h-3 w-3 mr-1" />
               Saved
             </Badge>

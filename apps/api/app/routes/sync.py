@@ -1,4 +1,4 @@
-"""Sync endpoints: Linear issues (incremental/full), codebase indexing, sync status and scheduling."""
+"""Sync endpoints: Linear issues (incremental/full), sync status and scheduling."""
 
 import asyncio
 import logging
@@ -19,13 +19,6 @@ class LinearSyncBody(BaseModel):
     token: str | None = Field(default=None, description="Linear API token (uses server config if omitted)")
     workspace_id: str = Field(default="", alias="workspaceId")
     force_full: bool = Field(default=False, alias="forceFull", description="Force full re-sync instead of incremental")
-
-    model_config = {"populate_by_name": True}
-
-
-class CodebaseSyncBody(BaseModel):
-    repo_url: str = Field(alias="repoUrl")
-    branch: str | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -148,25 +141,3 @@ async def get_sync_schedule():
     return {"running": running}
 
 
-@router.post("/sync/codebase", dependencies=[Depends(auth_dependency)])
-async def sync_codebase(body: CodebaseSyncBody):
-    try:
-        from gamole_ai.codebase.indexer import index_repository
-
-        from ..config import settings
-
-        stats = await index_repository(body.repo_url, body.branch, settings.github_token or None)
-        return {
-            "ok": True,
-            "repoName": stats.repo_name,
-            "filesIndexed": stats.files_indexed,
-            "chunksCreated": stats.chunks_created,
-            "errors": stats.errors,
-        }
-    except Exception as e:
-        message = str(e)
-        if message.startswith("REPO_LIMIT_EXCEEDED"):
-            raise HTTPException(status_code=422, detail=message)
-        if "database" in message.lower():
-            raise HTTPException(status_code=503, detail=message)
-        raise HTTPException(status_code=500, detail=message)

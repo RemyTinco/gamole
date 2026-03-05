@@ -16,7 +16,7 @@ class AgentInput(BaseModel):
 
 
 class AgentOutput(BaseModel):
-    revised_doc: str | None = None
+    revised_doc: str | None = Field(default=None, description="The revised document as markdown prose. MUST be formatted as readable markdown with headers (#, ##), bullet points (-), and paragraphs. NEVER output JSON or structured data — always human-readable markdown.")
     critique: str
     risk_flags: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0, le=1)

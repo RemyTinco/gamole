@@ -93,7 +93,7 @@ async def push_generation_to_linear(body: PushFromGenerationBody):
 
         result = await push_to_linear(output, body.config, token)
 
-        # Store original generated stories as AI_FINAL document version (for feedback tracking)
+        # Store original generated stories as AI_FINAL document version
         dv = DocumentVersionModel(
             workflow_id=wf.id,
             type="AI_FINAL",
