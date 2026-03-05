@@ -410,7 +410,7 @@ async def get_generation_traces(generation_id: str):
             traces = result.scalars().all()
             return {
                 "traces": [
-                    TraceEvent.model_validate(t, from_attributes=True).model_dump(mode="json")
+                    TraceEvent.model_validate(t, from_attributes=True).model_dump(by_alias=True, mode='json')
                     for t in traces
                 ]
             }
