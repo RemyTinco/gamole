@@ -14,17 +14,16 @@ import { Check, Circle, Loader2, Send, Save, ChevronDown, ChevronRight, AlertCir
 import { toast } from "sonner"
 import type { Generation, GeneratedEpic } from "@/lib/types"
 
-const PIPELINE_STEPS = ["Retrieve Context", "Discovery", "Draft", "QA/Dev/PO", "Supervisor", "Structure"]
+const PIPELINE_STEPS = ["Retrieve Context", "Discovery", "Refinement", "Editing", "Structure"]
 
 function stepIndex(node: string | null): number {
   if (!node) return -1
   const lower = node.toLowerCase()
   if (lower.includes("retriev") || lower.includes("context")) return 0
   if (lower.includes("discover") || lower.includes("awaiting")) return 1
-  if (lower.includes("draft")) return 2
-  if (lower.includes("qa") || lower.includes("dev") || lower.includes("po") || lower.includes("review")) return 3
-  if (lower.includes("supervis")) return 4
-  if (lower.includes("struct")) return 5
+  if (lower.includes("draft") || lower.includes("qa") || lower.includes("dev") || lower.includes("po") || lower.includes("review") || lower.includes("supervis") || lower.includes("merge")) return 2
+  if (lower.includes("user_edit") || lower.includes("editing")) return 3
+  if (lower.includes("struct")) return 4
   return -1
 }
 
@@ -48,7 +47,9 @@ export default function GenerationDetailPage({
   const canEditDocument = status === "USER_EDITING" || status === "READY_TO_PUSH"
   const isComplete = ["COMPLETED", "READY_TO_PUSH", "PUSHED_TO_LINEAR", "STRUCTURED"].includes(status) || stream.isComplete
   const isError = status === "ERROR"
-  const currentStepIdx = status === "AWAITING_DISCOVERY" ? 1 : stepIndex(stream.currentNode)
+  const isRunning = !isComplete && !isError && status !== "Loading" && status !== "connecting"
+  const rawStepIdx = status === "AWAITING_DISCOVERY" ? 1 : status === "USER_EDITING" ? 3 : stepIndex(stream.currentNode)
+  const currentStepIdx = rawStepIdx === -1 && isRunning ? 0 : rawStepIdx
 
   useEffect(() => {
     if (canEditDocument && gen?.document) {
@@ -145,7 +146,7 @@ export default function GenerationDetailPage({
               )
             })}
           </div>
-          {stream.round > 0 && (
+          {stream.round > 0 && currentStepIdx === 2 && (
             <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
               <span>Round {stream.round}/5</span>
               {stream.qualityScore != null && <span>Quality: {stream.qualityScore}%</span>}
