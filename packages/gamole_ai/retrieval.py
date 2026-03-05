@@ -59,10 +59,10 @@ async def retrieve_context(
                         title,
                         description,
                         team_id,
-                        1.0 - (embedding <=> (:query_vec)::vector) AS similarity
+                        1.0 - (embedding <=> CAST(:query_vec AS vector)) AS similarity
                     FROM linear_issues_cache
-                    WHERE (:team_id::text IS NULL OR team_id = :team_id)
-                    ORDER BY embedding <=> (:query_vec)::vector
+                    WHERE (CAST(:team_id AS text) IS NULL OR team_id = :team_id)
+                    ORDER BY embedding <=> CAST(:query_vec AS vector)
                     LIMIT :top_k
                     """
                 )
@@ -117,10 +117,10 @@ async def retrieve_context(
                         artifact_type,
                         symbol_name,
                         parent_symbol,
-                        1.0 - (embedding <=> (:query_vec)::vector) AS similarity
+                        1.0 - (embedding <=> CAST(:query_vec AS vector)) AS similarity
                     FROM codebase_chunks
-                    WHERE (:repo_names::text[] IS NULL OR repo_name = ANY(:repo_names::text[]))
-                    ORDER BY embedding <=> (:query_vec)::vector
+                    WHERE (CAST(:repo_names AS text[]) IS NULL OR repo_name = ANY(CAST(:repo_names AS text[])))
+                    ORDER BY embedding <=> CAST(:query_vec AS vector)
                     LIMIT :top_k_2x
                     """
                 )
@@ -154,7 +154,7 @@ async def retrieve_context(
                             ts_rank(content_tsv, plainto_tsquery('simple', :query)) AS ts_score
                         FROM codebase_chunks
                         WHERE content_tsv @@ plainto_tsquery('simple', :query)
-                          AND (:repo_names::text[] IS NULL OR repo_name = ANY(:repo_names::text[]))
+                          AND (CAST(:repo_names AS text[]) IS NULL OR repo_name = ANY(CAST(:repo_names AS text[])))
                         ORDER BY ts_rank(content_tsv, plainto_tsquery('simple', :query)) DESC
                         LIMIT :top_k_2x
                         """
