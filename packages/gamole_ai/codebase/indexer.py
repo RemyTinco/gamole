@@ -20,7 +20,8 @@ from .classifier import ALLOWED_EXTENSIONS, classifyFile, detect_language, isSec
 logger = logging.getLogger(__name__)
 
 REPOS_BASE_DIR = "/tmp/gamole-repos"
-MAX_REPOS = 3
+# Must stay in sync with apps/api/app/routes/repositories.py:MAX_REPOSITORIES.
+MAX_REPOS = 10
 REPO_LIMIT_ERROR_PREFIX = "REPO_LIMIT_EXCEEDED"
 
 SKIP_DIRS = {
@@ -64,16 +65,20 @@ async def _clone_or_pull(repo_url: str, target_dir: str, branch: str | None = No
     auth_url = _inject_token(repo_url, token)
 
     if os.path.exists(target_dir):
-        # Update remote URL in case token changed
-        _ = await asyncio.create_subprocess_exec(
+        set_url_proc = await asyncio.create_subprocess_exec(
             "git", "-C", target_dir, "remote", "set-url", "origin", auth_url,
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
+        await set_url_proc.wait()
         proc = await asyncio.create_subprocess_exec(
             "git", "-C", target_dir, "pull",
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         )
-        _ = await proc.wait()
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"git pull failed with exit code {proc.returncode}: {stderr.decode(errors='replace').strip()[:300]}"
+            )
         return
 
     args = ["git", "clone", "--depth=1"]
@@ -82,11 +87,13 @@ async def _clone_or_pull(repo_url: str, target_dir: str, branch: str | None = No
     args.extend([auth_url, target_dir])
 
     proc = await asyncio.create_subprocess_exec(
-        *args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        *args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
     )
-    code = await proc.wait()
-    if code != 0:
-        raise RuntimeError(f"git clone failed with exit code {code}")
+    _, stderr = await proc.communicate()
+    if proc.returncode != 0:
+        raise RuntimeError(
+            f"git clone failed with exit code {proc.returncode}: {stderr.decode(errors='replace').strip()[:300]}"
+        )
 
 
 def _walk_files(dir_path: str) -> list[str]:
@@ -123,13 +130,9 @@ async def index_repository(repo_url: str, branch: str | None = None, github_toke
                 f"{REPO_LIMIT_ERROR_PREFIX}: Repository limit reached (max {MAX_REPOS}). Remove an existing repo first."
             )
 
-        # Clone / pull
-        try:
-            await _clone_or_pull(repo_url, target_dir, branch, github_token)
-        except Exception as e:
-            logger.error(f"[codebase] Clone/pull failed for {repo_url}: {e}")
-            stats.errors += 1
-            return stats
+        # Clone / pull. Let failures propagate so callers can mark indexing
+        # as "error" instead of silently reporting 0 files indexed.
+        await _clone_or_pull(repo_url, target_dir, branch, github_token)
 
         # Walk files
         file_paths = _walk_files(target_dir)

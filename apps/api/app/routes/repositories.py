@@ -267,18 +267,30 @@ async def _run_indexing(repo_id: str, repo_url: str, branch: str | None) -> None
 
         stats = await index_repository(repo_url, branch, settings.github_token or None)
 
-        # Update repo with results
+        # Update repo with results. file_count/chunk_count must reflect the
+        # TOTAL chunks in DB for this repo, not just what was indexed in this
+        # pass — stats.files_indexed=0 is normal when all files are unchanged.
         async for session in get_session():
             repo = await session.get(Repository, uuid.UUID(repo_id))
             if repo:
+                chunk_total = (await session.execute(
+                    select(func.count()).select_from(CodebaseChunk).where(CodebaseChunk.repo_name == repo.name)
+                )).scalar() or 0
+                file_total = (await session.execute(
+                    select(func.count(func.distinct(CodebaseChunk.file_path))).where(CodebaseChunk.repo_name == repo.name)
+                )).scalar() or 0
+
                 repo.indexed_at = datetime.utcnow()
-                repo.file_count = stats.files_indexed
-                repo.chunk_count = stats.chunks_created
+                repo.file_count = file_total
+                repo.chunk_count = chunk_total
                 repo.indexing_status = "done"
                 repo.indexing_error = None
                 repo.updated_at = datetime.utcnow()
                 await session.commit()
-        logger.info(f"Indexing complete for {repo_url}: {stats.files_indexed} files, {stats.chunks_created} chunks")
+        logger.info(
+            f"Indexing complete for {repo_url}: indexed_now={stats.files_indexed} skipped={stats.files_skipped} "
+            f"errors={stats.errors} totals: files={file_total} chunks={chunk_total}"
+        )
     except Exception as e:
         logger.error(f"Indexing failed for {repo_url}: {e}", exc_info=True)
         try:
