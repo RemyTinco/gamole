@@ -1,23 +1,17 @@
-"""Auth middleware - ported from apps/api/src/auth/middleware.ts."""
+"""Auth middleware - trusts tinyauth's Remote-User header from Caddy forward_auth."""
 
 from fastapi import HTTPException, Request
 
-from .jwt import validate_session
-
 
 async def auth_dependency(request: Request) -> dict:
-    """FastAPI dependency that validates JWT Bearer token."""
-    auth_header = request.headers.get("Authorization", "")
-
-    if not auth_header.startswith("Bearer "):
+    """Require a Remote-User header populated by tinyauth via Caddy forward_auth."""
+    user = request.headers.get("Remote-User")
+    if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    token = auth_header[7:]
-    if not token or len(token) < 10:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    try:
-        payload = validate_session(token)
-        return payload
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return {
+        "userId": user,
+        "email": request.headers.get("Remote-Email"),
+        "name": request.headers.get("Remote-Name"),
+        "groups": request.headers.get("Remote-Groups"),
+    }

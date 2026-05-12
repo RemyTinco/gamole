@@ -4,9 +4,10 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: gamole-postgres
+    restart: unless-stopped
     env_file: .env
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./initdb:/docker-entrypoint-initdb.d
@@ -21,30 +22,49 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: gamole-api
+    restart: unless-stopped
     env_file: .env
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:gamole_dev@postgres:5432/gamole
+      - CORS_ORIGINS=https://gamole.remytinco.fr,http://localhost:3000
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - shared
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost:3001
+        # Baked into the Next.js bundle at build time. Same-origin via Caddy
+        # avoids CORS entirely (browser → /api/* hits the api container).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://gamole.remytinco.fr}
     container_name: gamole-web
+    restart: unless-stopped
     env_file: .env
     environment:
       - PORT=3000
+      # Next.js standalone server defaults to localhost; needs 0.0.0.0 for Caddy to reach it.
+      - HOSTNAME=0.0.0.0
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
       api:
         condition: service_started
+    networks:
+      - default
+      - shared
 
 volumes:
   postgres-data:
+
+networks:
+  default:
+  shared:
+    name: shared_internal_network
+    external: true

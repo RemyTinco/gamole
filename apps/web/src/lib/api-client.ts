@@ -8,6 +8,10 @@ import type {
   ChatResponse,
   SyncStatus,
   TraceEvent,
+  SpecArtifact,
+  SpecArtifactKind,
+  SpecClarifyState,
+  ConstitutionPayload,
 } from "./types"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
@@ -15,22 +19,12 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
 export const api = ky.create({
   prefixUrl: API_BASE,
   timeout: 30000,
+  credentials: "include",
   hooks: {
-    beforeRequest: [
-      (request) => {
-        const token =
-          typeof window !== "undefined"
-            ? localStorage.getItem("gamole_token")
-            : null
-        if (token) {
-          request.headers.set("Authorization", `Bearer ${token}`)
-        }
-      },
-    ],
     afterResponse: [
       (_request, _options, response) => {
         if (response.status === 401 && typeof window !== "undefined") {
-          window.location.href = "/login"
+          window.location.reload()
         }
       },
     ],
@@ -82,9 +76,8 @@ export async function submitDiscoveryAnswers(id: string, answers: Array<{ questi
 }
 
 export function streamGeneration(id: string): EventSource {
-  const token = typeof window !== "undefined" ? localStorage.getItem("gamole_token") : null
-  const url = `${API_BASE}/api/generation/${id}/stream${token ? `?token=${token}` : ""}`
-  return new EventSource(url)
+  const url = `${API_BASE}/api/generation/${id}/stream`
+  return new EventSource(url, { withCredentials: true })
 }
 
 // Linear
@@ -197,6 +190,47 @@ export async function getLinearSchedule() {
 }
 
 
+
+// Spec-Driven Development (SDD) endpoints
+export async function startSpecWorkflow(generationId: string) {
+  return api.post(`api/generation/${generationId}/spec/start`).json<{ id: string; status: string }>()
+}
+
+export async function listSpecArtifacts(generationId: string) {
+  return api.get(`api/generation/${generationId}/spec`).json<{ artifacts: SpecArtifact[] }>()
+}
+
+export async function getSpecArtifact(generationId: string, kind: SpecArtifactKind) {
+  return api.get(`api/generation/${generationId}/spec/${kind}`).json<SpecArtifact>()
+}
+
+export async function saveSpecArtifact(generationId: string, kind: SpecArtifactKind, content: string) {
+  return api.put(`api/generation/${generationId}/spec/${kind}`, { json: { content } }).json<SpecArtifact>()
+}
+
+export async function getSpecClarifyState(generationId: string) {
+  return api.get(`api/generation/${generationId}/spec/clarify`).json<SpecClarifyState>()
+}
+
+export async function submitSpecClarifications(
+  generationId: string,
+  answers: Array<{ question_id: string; answer: string }>,
+) {
+  return api.post(`api/generation/${generationId}/spec/clarify`, { json: { answers } }).json<{ id: string; status: string }>()
+}
+
+export function specDownloadUrl(generationId: string): string {
+  return `${API_BASE}/api/generation/${generationId}/spec/download`
+}
+
+// Constitution
+export async function getConstitution() {
+  return api.get("api/constitution").json<ConstitutionPayload>()
+}
+
+export async function saveConstitution(content: string) {
+  return api.put("api/constitution", { json: { content } }).json<ConstitutionPayload>()
+}
 
 // Generic helpers
 export async function apiFetch<T = unknown>(path: string): Promise<T> {
