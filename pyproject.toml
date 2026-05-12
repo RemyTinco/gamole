@@ -24,11 +24,11 @@ dependencies = [
     "slowapi>=0.1.9",
     "rapidfuzz>=3.0.0",
     "tree-sitter>=0.25.0",
-    "tree-sitter-language-pack>=0.13.0",
+    "tree-sitter-language-pack>=0.13.0,<1.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0", "ruff>=0.8.0"]
+dev = ["pytest>=8.3.0", "pytest-asyncio>=0.24.0", "ruff>=0.8.0", "psycopg2-binary>=2.9.0"]
 
 [build-system]
 requires = ["hatchling"]
@@ -40,6 +40,7 @@ packages = [
     "packages/gamole_db",
     "packages/gamole_ai",
     "packages/gamole_linear",
+    "packages/gamole_speckit",
     "apps/api/app",
 ]
 
